@@ -1,0 +1,114 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag (for example: v1.0.0)"
+        required: true
+        type: string
+      ref:
+        description: "Git ref to release from"
+        required: false
+        default: "main"
+        type: string
+      prerelease:
+        description: "Mark as pre-release"
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ inputs.tag }}
+  cancel-in-progress: false
+
+jobs:
+  create-release:
+    runs-on: ubuntu-latest
+    container: swift:6.0
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.ref }}
+          fetch-depth: 0
+
+      - name: Configure git safe directory
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
+      - name: Install GitHub CLI
+        run: |
+          apt-get update
+          apt-get install -y gh
+
+      - name: Validate and run tests
+        run: |
+          swift --version
+          swift test -q
+
+      - name: Normalize tag
+        id: normalize
+        run: |
+          TAG="${{ inputs.tag }}"
+          if [[ ! "$TAG" =~ ^v ]]; then
+            TAG="v$TAG"
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Ensure tag does not already exist
+        run: |
+          git fetch --tags origin
+          TAG="${{ steps.normalize.outputs.tag }}"
+          if git rev-parse --verify "refs/tags/$TAG" >/dev/null 2>&1; then
+            echo "Tag '$TAG' already exists."
+            exit 1
+          fi
+
+      - name: Create and push tag
+        run: |
+          TAG="${{ steps.normalize.outputs.tag }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag "$TAG"
+          git push origin "$TAG"
+
+      - name: Build release overview
+        run: |
+          TAG="${{ steps.normalize.outputs.tag }}"
+          cat > "$RUNNER_TEMP/release-overview.md" <<EOF
+          ## Overview
+
+          Release \`$TAG\` for **swift-subtitle-kit**.
+
+          Auto-generated release notes are grouped by labels using \`.github/release.yml\`.
+
+          ## Installation
+
+          \`\`\`swift
+          .package(url: "https://github.com/dioKaratzas/swift-subtitle-kit.git", from: "${TAG#v}")
+          \`\`\`
+
+          ## Documentation
+
+          https://diokaratzas.github.io/swift-subtitle-kit/documentation/subtitlekit/
+          EOF
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="${{ steps.normalize.outputs.tag }}"
+          PRE_FLAG=""
+          if [[ "${{ inputs.prerelease }}" == "true" ]]; then
+            PRE_FLAG="--prerelease"
+          fi
+
+          gh release create "$TAG" \
+            --target "$GITHUB_SHA" \
+            --title "$TAG" \
+            --generate-notes \
+            --notes-file "$RUNNER_TEMP/release-overview.md" \
+            $PRE_FLAG
