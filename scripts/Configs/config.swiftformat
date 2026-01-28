@@ -35,7 +35,7 @@
 --group-blank-lines true
 --grouped-extension "MARK: %c"
 --guard-else same-line
---header "//\n//  SubsTranslatorBackend\n//  Subtitle translation backend.\n//"
+--header "//\n//  ChromecastKit\n//  Swift package for Google Cast (Chromecast).\n//"
 --hex-grouping 4,8
 --hex-literal-case uppercase
 --ifdef indent
