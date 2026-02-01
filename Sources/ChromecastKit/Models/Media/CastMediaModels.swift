@@ -219,7 +219,7 @@ public enum CastTextTrackSubtype: String, Sendable, Hashable, Codable {
 
 /// A subtitle/caption track associated with a media item.
 public struct CastTextTrack: Sendable, Hashable, Codable, Identifiable {
-    public var id: Int
+    public var id: CastMediaTrackID
     public var kind: CastTextTrackKind
     public var subtype: CastTextTrackSubtype?
     public var name: String
@@ -228,7 +228,7 @@ public struct CastTextTrack: Sendable, Hashable, Codable, Identifiable {
     public var contentType: String
 
     public init(
-        id: Int,
+        id: CastMediaTrackID,
         kind: CastTextTrackKind = .text,
         subtype: CastTextTrackSubtype? = .subtitles,
         name: String,
@@ -247,7 +247,7 @@ public struct CastTextTrack: Sendable, Hashable, Codable, Identifiable {
 
     /// Creates a VTT subtitle track with sensible defaults for Cast receivers.
     public static func subtitleVTT(
-        id: Int,
+        id: CastMediaTrackID,
         name: String,
         languageCode: String,
         url: URL
@@ -425,12 +425,12 @@ public struct CastMediaStatus: Sendable, Hashable, Codable {
     public let playerState: CastPlayerState
     public let idleReason: CastIdleReason?
     public let streamType: CastStreamType
-    public let mediaSessionID: Int?
+    public let mediaSessionID: CastMediaSessionID?
     public let contentURL: URL?
     public let contentType: String?
     public let metadata: CastMediaMetadata?
     public let textTracks: [CastTextTrack]
-    public let activeTextTrackIDs: [Int]
+    public let activeTextTrackIDs: [CastMediaTrackID]
     public let volume: CastVolumeStatus
     public let supportedCommands: CastMediaCommandSet
     public let lastUpdated: Date
@@ -442,12 +442,12 @@ public struct CastMediaStatus: Sendable, Hashable, Codable {
         playerState: CastPlayerState = .unknown,
         idleReason: CastIdleReason? = nil,
         streamType: CastStreamType = .unknown,
-        mediaSessionID: Int? = nil,
+        mediaSessionID: CastMediaSessionID? = nil,
         contentURL: URL? = nil,
         contentType: String? = nil,
         metadata: CastMediaMetadata? = nil,
         textTracks: [CastTextTrack] = [],
-        activeTextTrackIDs: [Int] = [],
+        activeTextTrackIDs: [CastMediaTrackID] = [],
         volume: CastVolumeStatus = .init(level: 1, muted: false),
         supportedCommands: CastMediaCommandSet = [],
         lastUpdated: Date = Date()

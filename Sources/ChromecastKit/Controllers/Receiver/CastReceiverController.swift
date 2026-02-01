@@ -18,7 +18,7 @@ public actor CastReceiverController {
 
     /// Requests receiver status from the Cast platform namespace.
     @discardableResult
-    public func getStatus() async throws -> Int {
+    public func getStatus() async throws -> CastRequestID {
         try await dispatcher.send(
             namespace: .receiver,
             target: .platform,
@@ -28,7 +28,7 @@ public actor CastReceiverController {
 
     /// Sets device volume to a level between `0.0` and `1.0`.
     @discardableResult
-    public func setVolume(level: Double) async throws -> Int {
+    public func setVolume(level: Double) async throws -> CastRequestID {
         try await dispatcher.send(
             namespace: .receiver,
             target: .platform,
@@ -38,7 +38,7 @@ public actor CastReceiverController {
 
     /// Sets muted state on the receiver.
     @discardableResult
-    public func setMuted(_ muted: Bool) async throws -> Int {
+    public func setMuted(_ muted: Bool) async throws -> CastRequestID {
         try await dispatcher.send(
             namespace: .receiver,
             target: .platform,
@@ -48,7 +48,7 @@ public actor CastReceiverController {
 
     /// Launches an app on the receiver by app ID.
     @discardableResult
-    public func launch(appID: String) async throws -> Int {
+    public func launch(appID: CastAppID) async throws -> CastRequestID {
         try await dispatcher.send(
             namespace: .receiver,
             target: .platform,
@@ -58,7 +58,7 @@ public actor CastReceiverController {
 
     /// Stops the current receiver app session.
     @discardableResult
-    public func stop(sessionID: String? = nil) async throws -> Int {
+    public func stop(sessionID: CastAppSessionID? = nil) async throws -> CastRequestID {
         try await dispatcher.send(
             namespace: .receiver,
             target: .platform,
@@ -68,7 +68,7 @@ public actor CastReceiverController {
 
     /// Queries app availability for one or more app IDs.
     @discardableResult
-    public func getAppAvailability(appIDs: [String]) async throws -> Int {
+    public func getAppAvailability(appIDs: [CastAppID]) async throws -> CastRequestID {
         try await dispatcher.send(
             namespace: .receiver,
             target: .platform,
@@ -76,4 +76,3 @@ public actor CastReceiverController {
         )
     }
 }
-

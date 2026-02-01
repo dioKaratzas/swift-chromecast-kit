@@ -14,13 +14,13 @@ public enum CastMediaPayloadBuilder {
     public struct LoadOptions: Sendable, Hashable, Codable {
         public var autoplay: Bool
         public var startTime: TimeInterval?
-        public var activeTextTrackIDs: [Int]
+        public var activeTextTrackIDs: [CastMediaTrackID]
         public var customData: JSONValue?
 
         public init(
             autoplay: Bool = true,
             startTime: TimeInterval? = nil,
-            activeTextTrackIDs: [Int] = [],
+            activeTextTrackIDs: [CastMediaTrackID] = [],
             customData: JSONValue? = nil
         ) {
             self.autoplay = autoplay
@@ -45,7 +45,7 @@ public enum CastMediaPayloadBuilder {
     }
 
     /// Builds an `EDIT_TRACKS_INFO` request to enable one text track.
-    public static func enableTextTrack(trackID: Int) -> CastWire.Media.EditTracksInfoRequest {
+    public static func enableTextTrack(trackID: CastMediaTrackID) -> CastWire.Media.EditTracksInfoRequest {
         CastWire.Media.EditTracksInfoRequest(activeTrackIds: [trackID])
     }
 
@@ -57,6 +57,78 @@ public enum CastMediaPayloadBuilder {
     /// Builds an `EDIT_TRACKS_INFO` request to update text track style.
     public static func textTrackStyle(_ style: CastTextTrackStyle) -> CastWire.Media.EditTracksInfoRequest {
         CastWire.Media.EditTracksInfoRequest(textTrackStyle: wireTextTrackStyle(from: style))
+    }
+
+    /// Builds a media `GET_STATUS` request.
+    public static func getStatus() -> CastWire.Media.GetStatusRequest {
+        .init()
+    }
+
+    /// Builds a media `PLAY` request.
+    public static func play(mediaSessionID: CastMediaSessionID) -> CastWire.Media.PlayRequest {
+        .init(mediaSessionId: mediaSessionID)
+    }
+
+    /// Builds a media `PAUSE` request.
+    public static func pause(mediaSessionID: CastMediaSessionID) -> CastWire.Media.PauseRequest {
+        .init(mediaSessionId: mediaSessionID)
+    }
+
+    /// Builds a media `STOP` request.
+    public static func stop(mediaSessionID: CastMediaSessionID) -> CastWire.Media.StopRequest {
+        .init(mediaSessionId: mediaSessionID)
+    }
+
+    /// Builds a media `SEEK` request.
+    public static func seek(
+        to time: TimeInterval,
+        mediaSessionID: CastMediaSessionID,
+        resume: Bool? = nil
+    ) -> CastWire.Media.SeekRequest {
+        let resumeState: CastWire.Media.ResumeState?
+        switch resume {
+        case .none:
+            resumeState = nil
+        case .some(true):
+            resumeState = .playbackStart
+        case .some(false):
+            resumeState = .playbackPause
+        }
+
+        return .init(
+            mediaSessionId: mediaSessionID,
+            currentTime: time,
+            resumeState: resumeState
+        )
+    }
+
+    /// Builds a media `SET_PLAYBACK_RATE` request.
+    public static func setPlaybackRate(
+        _ rate: Double,
+        mediaSessionID: CastMediaSessionID
+    ) -> CastWire.Media.SetPlaybackRateRequest {
+        .init(mediaSessionId: mediaSessionID, playbackRate: rate)
+    }
+
+    /// Builds an `EDIT_TRACKS_INFO` request to enable one text track for a media session.
+    public static func enableTextTrack(
+        trackID: CastMediaTrackID,
+        mediaSessionID: CastMediaSessionID
+    ) -> CastWire.Media.EditTracksInfoRequest {
+        .init(mediaSessionId: mediaSessionID, activeTrackIds: [trackID])
+    }
+
+    /// Builds an `EDIT_TRACKS_INFO` request to disable active text tracks for a media session.
+    public static func disableTextTracks(mediaSessionID: CastMediaSessionID) -> CastWire.Media.EditTracksInfoRequest {
+        .init(mediaSessionId: mediaSessionID, activeTrackIds: [])
+    }
+
+    /// Builds an `EDIT_TRACKS_INFO` request to update text track style for a media session.
+    public static func textTrackStyle(
+        _ style: CastTextTrackStyle,
+        mediaSessionID: CastMediaSessionID
+    ) -> CastWire.Media.EditTracksInfoRequest {
+        .init(mediaSessionId: mediaSessionID, textTrackStyle: wireTextTrackStyle(from: style))
     }
 
     private static func mediaInformation(from item: CastMediaItem) -> CastWire.Media.Information {

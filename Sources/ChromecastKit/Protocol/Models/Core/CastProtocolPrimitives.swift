@@ -41,7 +41,7 @@ public struct CastNamespace: RawRepresentable, ExpressibleByStringLiteral, Senda
 public enum CastMessageTarget: Sendable, Hashable, Codable {
     case currentApplication
     case platform
-    case transport(id: String)
+    case transport(id: CastTransportID)
 
     private enum CodingKeys: String, CodingKey {
         case kind
@@ -62,7 +62,7 @@ public enum CastMessageTarget: Sendable, Hashable, Codable {
         case .platform:
             self = .platform
         case .transport:
-            self = try .transport(id: container.decode(String.self, forKey: .transportID))
+            self = try .transport(id: container.decode(CastTransportID.self, forKey: .transportID))
         }
     }
 
@@ -85,16 +85,16 @@ public enum CastMessageTarget: Sendable, Hashable, Codable {
 /// This type is intentionally a value type. The owner responsible for shared access
 /// (typically a connection/session actor) should serialize mutation.
 public struct CastRequestIDGenerator: Sendable, Hashable, Codable {
-    public private(set) var current: Int
+    public private(set) var current: CastRequestID
 
-    public init(startingAt current: Int = 0) {
+    public init(startingAt current: CastRequestID = 0) {
         self.current = current
     }
 
     /// Returns the next request identifier and advances the generator.
     @discardableResult
-    public mutating func next() -> Int {
-        current += 1
+    public mutating func next() -> CastRequestID {
+        current = CastRequestID(rawValue: current.rawValue + 1)
         return current
     }
 }

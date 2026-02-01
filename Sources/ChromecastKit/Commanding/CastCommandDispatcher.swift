@@ -6,7 +6,7 @@
 import Foundation
 
 struct CastEncodedCommand: Sendable, Hashable {
-    let requestID: Int
+    let requestID: CastRequestID
     let route: CastMessageRoute
     let payloadUTF8: String
 }
@@ -22,22 +22,22 @@ protocol CastCommandTransport: Sendable {
 actor CastCommandDispatcher {
     private let transport: any CastCommandTransport
     private var requestIDs = CastRequestIDGenerator()
-    private var sourceID: String
-    private var currentApplicationTransportID: String?
+    private var sourceID: CastEndpointID
+    private var currentApplicationTransportID: CastTransportID?
 
     init(
         transport: any CastCommandTransport,
-        sourceID: String = "sender-0"
+        sourceID: CastEndpointID = "sender-0"
     ) {
         self.transport = transport
         self.sourceID = sourceID
     }
 
-    func setSourceID(_ sourceID: String) {
+    func setSourceID(_ sourceID: CastEndpointID) {
         self.sourceID = sourceID
     }
 
-    func setCurrentApplicationTransportID(_ transportID: String?) {
+    func setCurrentApplicationTransportID(_ transportID: CastTransportID?) {
         currentApplicationTransportID = transportID
     }
 
@@ -46,7 +46,7 @@ actor CastCommandDispatcher {
         namespace: CastNamespace,
         target: CastMessageTarget,
         payload: Payload
-    ) async throws -> Int {
+    ) async throws -> CastRequestID {
         let route = try resolveRoute(namespace: namespace, target: target)
         let requestID = requestIDs.next()
         let payloadUTF8 = try encodePayloadUTF8(payload, requestID: requestID, route: route)
@@ -58,18 +58,18 @@ actor CastCommandDispatcher {
         namespace: CastNamespace,
         target: CastMessageTarget
     ) throws -> CastMessageRoute {
-        let destinationID: String
+        let destinationID: CastEndpointID
 
         switch target {
         case .platform:
             destinationID = "receiver-0"
         case let .transport(id):
-            destinationID = id
+            destinationID = .init(id.rawValue)
         case .currentApplication:
             guard let currentApplicationTransportID else {
                 throw CastError.noActiveMediaSession
             }
-            destinationID = currentApplicationTransportID
+            destinationID = .init(currentApplicationTransportID.rawValue)
         }
 
         return CastMessageRoute(
@@ -81,13 +81,13 @@ actor CastCommandDispatcher {
 
     private func encodePayloadUTF8<Payload: Encodable & Sendable>(
         _ payload: Payload,
-        requestID: Int,
+        requestID: CastRequestID,
         route: CastMessageRoute
     ) throws -> String {
         let outbound = CastOutboundMessage(route: route, payload: payload)
         let encoded = try CastMessageJSONCodec.encodePayload(outbound)
         var object = try CastMessageJSONCodec.decodePayload([String: JSONValue].self, from: encoded)
-        object["requestId"] = .number(Double(requestID))
+        object["requestId"] = .number(Double(requestID.rawValue))
         return try encodeJSONObject(object)
     }
 
@@ -99,4 +99,3 @@ actor CastCommandDispatcher {
         return string
     }
 }
-

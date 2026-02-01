@@ -54,11 +54,11 @@ public extension CastWire.Receiver {
     /// Wire model for a receiver `LAUNCH` request.
     struct LaunchRequest: Sendable, Hashable, Codable {
         public let type: CastReceiverMessageType
-        public let appId: String
+        public let appId: CastAppID
 
         public init(
             type: CastReceiverMessageType = .launch,
-            appId: String
+            appId: CastAppID
         ) {
             self.type = type
             self.appId = appId
@@ -70,11 +70,11 @@ public extension CastWire.Receiver {
     /// Wire model for a receiver `STOP` request.
     struct StopRequest: Sendable, Hashable, Codable {
         public let type: CastReceiverMessageType
-        public let sessionId: String?
+        public let sessionId: CastAppSessionID?
 
         public init(
             type: CastReceiverMessageType = .stop,
-            sessionId: String? = nil
+            sessionId: CastAppSessionID? = nil
         ) {
             self.type = type
             self.sessionId = sessionId
@@ -86,11 +86,11 @@ public extension CastWire.Receiver {
     /// Wire model for a receiver `GET_APP_AVAILABILITY` request.
     struct GetAppAvailabilityRequest: Sendable, Hashable, Codable {
         public let type: CastReceiverMessageType
-        public let appId: [String]
+        public let appId: [CastAppID]
 
         public init(
             type: CastReceiverMessageType = .getAppAvailability,
-            appId: [String]
+            appId: [CastAppID]
         ) {
             self.type = type
             self.appId = appId

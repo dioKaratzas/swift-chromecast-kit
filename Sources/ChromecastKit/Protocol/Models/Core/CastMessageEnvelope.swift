@@ -7,13 +7,13 @@ import Foundation
 
 /// Message route metadata for a Cast message frame.
 public struct CastMessageRoute: Sendable, Hashable, Codable {
-    public let sourceID: String
-    public let destinationID: String
+    public let sourceID: CastEndpointID
+    public let destinationID: CastEndpointID
     public let namespace: CastNamespace
 
     public init(
-        sourceID: String,
-        destinationID: String,
+        sourceID: CastEndpointID,
+        destinationID: CastEndpointID,
         namespace: CastNamespace
     ) {
         self.sourceID = sourceID
@@ -23,7 +23,7 @@ public struct CastMessageRoute: Sendable, Hashable, Codable {
 
     /// Standard sender route to the Cast platform destination (`receiver-0`).
     public static func platform(
-        sourceID: String = "sender-0",
+        sourceID: CastEndpointID = "sender-0",
         namespace: CastNamespace
     ) -> Self {
         .init(sourceID: sourceID, destinationID: "receiver-0", namespace: namespace)

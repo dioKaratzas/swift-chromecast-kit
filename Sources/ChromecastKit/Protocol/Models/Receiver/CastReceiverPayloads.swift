@@ -23,17 +23,17 @@ public enum CastReceiverPayloadBuilder {
     }
 
     /// Builds a receiver `LAUNCH` request for the specified app ID.
-    public static func launch(appID: String) -> CastWire.Receiver.LaunchRequest {
+    public static func launch(appID: CastAppID) -> CastWire.Receiver.LaunchRequest {
         .init(appId: appID)
     }
 
     /// Builds a receiver `STOP` request.
-    public static func stop(sessionID: String? = nil) -> CastWire.Receiver.StopRequest {
+    public static func stop(sessionID: CastAppSessionID? = nil) -> CastWire.Receiver.StopRequest {
         .init(sessionId: sessionID)
     }
 
     /// Builds a receiver `GET_APP_AVAILABILITY` request.
-    public static func getAppAvailability(appIDs: [String]) -> CastWire.Receiver.GetAppAvailabilityRequest {
+    public static func getAppAvailability(appIDs: [CastAppID]) -> CastWire.Receiver.GetAppAvailabilityRequest {
         .init(appId: appIDs)
     }
 }

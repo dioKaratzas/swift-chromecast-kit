@@ -12,13 +12,121 @@ public enum CastWire {
 }
 
 public extension CastWire.Media {
+    /// Resume state behavior for `SEEK` commands.
+    enum ResumeState: String, Sendable, Hashable, Codable {
+        case playbackStart = "PLAYBACK_START"
+        case playbackPause = "PLAYBACK_PAUSE"
+    }
+}
+
+public extension CastWire.Media {
+    /// Wire model for a media `GET_STATUS` request.
+    struct GetStatusRequest: Sendable, Hashable, Codable {
+        public let type: CastMediaMessageType
+
+        public init(type: CastMediaMessageType = .getStatus) {
+            self.type = type
+        }
+    }
+}
+
+public extension CastWire.Media {
+    /// Wire model for a media `PLAY` request.
+    struct PlayRequest: Sendable, Hashable, Codable {
+        public let type: CastMediaMessageType
+        public let mediaSessionId: CastMediaSessionID
+
+        public init(
+            type: CastMediaMessageType = .play,
+            mediaSessionId: CastMediaSessionID
+        ) {
+            self.type = type
+            self.mediaSessionId = mediaSessionId
+        }
+    }
+}
+
+public extension CastWire.Media {
+    /// Wire model for a media `PAUSE` request.
+    struct PauseRequest: Sendable, Hashable, Codable {
+        public let type: CastMediaMessageType
+        public let mediaSessionId: CastMediaSessionID
+
+        public init(
+            type: CastMediaMessageType = .pause,
+            mediaSessionId: CastMediaSessionID
+        ) {
+            self.type = type
+            self.mediaSessionId = mediaSessionId
+        }
+    }
+}
+
+public extension CastWire.Media {
+    /// Wire model for a media `STOP` request.
+    struct StopRequest: Sendable, Hashable, Codable {
+        public let type: CastMediaMessageType
+        public let mediaSessionId: CastMediaSessionID
+
+        public init(
+            type: CastMediaMessageType = .stop,
+            mediaSessionId: CastMediaSessionID
+        ) {
+            self.type = type
+            self.mediaSessionId = mediaSessionId
+        }
+    }
+}
+
+public extension CastWire.Media {
+    /// Wire model for a media `SEEK` request.
+    struct SeekRequest: Sendable, Hashable, Codable {
+        public let type: CastMediaMessageType
+        public let mediaSessionId: CastMediaSessionID
+        public let currentTime: TimeInterval
+        public let resumeState: ResumeState?
+
+        public init(
+            type: CastMediaMessageType = .seek,
+            mediaSessionId: CastMediaSessionID,
+            currentTime: TimeInterval,
+            resumeState: ResumeState? = nil
+        ) {
+            self.type = type
+            self.mediaSessionId = mediaSessionId
+            self.currentTime = currentTime
+            self.resumeState = resumeState
+        }
+    }
+}
+
+public extension CastWire.Media {
+    /// Wire model for a media `SET_PLAYBACK_RATE` request.
+    struct SetPlaybackRateRequest: Sendable, Hashable, Codable {
+        public let type: CastMediaMessageType
+        public let mediaSessionId: CastMediaSessionID
+        public let playbackRate: Double
+
+        public init(
+            type: CastMediaMessageType = .setPlaybackRate,
+            mediaSessionId: CastMediaSessionID,
+            playbackRate: Double
+        ) {
+            self.type = type
+            self.mediaSessionId = mediaSessionId
+            self.playbackRate = playbackRate
+        }
+    }
+}
+
+public extension CastWire.Media {
     /// Wire model for a Cast media `LOAD` request.
     struct LoadRequest: Sendable, Hashable, Codable {
         public let type: CastMediaMessageType
         public let media: Information
         public let autoplay: Bool
         public let currentTime: TimeInterval?
-        public let activeTrackIds: [Int]?
+        public let activeTrackIds: [CastMediaTrackID]?
         public let customData: JSONValue
 
         public init(
@@ -26,7 +134,7 @@ public extension CastWire.Media {
             media: Information,
             autoplay: Bool,
             currentTime: TimeInterval? = nil,
-            activeTrackIds: [Int]? = nil,
+            activeTrackIds: [CastMediaTrackID]? = nil,
             customData: JSONValue = .object([:])
         ) {
             self.type = type
@@ -43,15 +151,18 @@ public extension CastWire.Media {
     /// Wire model for a Cast `EDIT_TRACKS_INFO` request.
     struct EditTracksInfoRequest: Sendable, Hashable, Codable {
         public let type: CastMediaMessageType
-        public let activeTrackIds: [Int]?
+        public let mediaSessionId: CastMediaSessionID?
+        public let activeTrackIds: [CastMediaTrackID]?
         public let textTrackStyle: TextTrackStyle?
 
         public init(
             type: CastMediaMessageType = .editTracksInfo,
-            activeTrackIds: [Int]? = nil,
+            mediaSessionId: CastMediaSessionID? = nil,
+            activeTrackIds: [CastMediaTrackID]? = nil,
             textTrackStyle: TextTrackStyle? = nil
         ) {
             self.type = type
+            self.mediaSessionId = mediaSessionId
             self.activeTrackIds = activeTrackIds
             self.textTrackStyle = textTrackStyle
         }
@@ -159,7 +270,7 @@ public extension CastWire.Media {
 public extension CastWire.Media {
     /// Wire model for Cast subtitle/caption tracks.
     struct Track: Sendable, Hashable, Codable {
-        public let trackId: Int
+        public let trackId: CastMediaTrackID
         public let type: CastTextTrackKind
         public let name: String
         public let language: String
@@ -168,7 +279,7 @@ public extension CastWire.Media {
         public let subtype: CastTextTrackSubtype?
 
         public init(
-            trackId: Int,
+            trackId: CastMediaTrackID,
             type: CastTextTrackKind,
             name: String,
             language: String,

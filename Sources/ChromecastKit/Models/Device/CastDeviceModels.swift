@@ -71,18 +71,18 @@ public struct CastVolumeStatus: Sendable, Hashable, Codable {
 
 /// The app currently running on the Cast receiver.
 public struct CastRunningApp: Sendable, Hashable, Codable {
-    public let appID: String
+    public let appID: CastAppID
     public let displayName: String
-    public let sessionID: String?
-    public let transportID: String?
+    public let sessionID: CastAppSessionID?
+    public let transportID: CastTransportID?
     public let statusText: String?
     public let namespaces: [String]
 
     public init(
-        appID: String,
+        appID: CastAppID,
         displayName: String,
-        sessionID: String? = nil,
-        transportID: String? = nil,
+        sessionID: CastAppSessionID? = nil,
+        transportID: CastTransportID? = nil,
         statusText: String? = nil,
         namespaces: [String] = []
     ) {

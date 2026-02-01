@@ -3,8 +3,8 @@
 //  Swift package for Google Cast (Chromecast).
 //
 
-import Foundation
 import Testing
+import Foundation
 @testable import ChromecastKit
 
 @Suite("Cast Controllers")
@@ -49,6 +49,7 @@ struct CastControllersTests {
         )
 
         let req1 = try await mediaController.load(item, options: .init(activeTextTrackIDs: [1]))
+        await mediaController.setMediaSessionID(77)
         let req2 = try await mediaController.disableTextTracks()
 
         #expect(req1 == 1)
@@ -67,21 +68,69 @@ struct CastControllersTests {
         #expect(loadJSON["requestId"] == .number(1))
         #expect(disableJSON["type"] == .string("EDIT_TRACKS_INFO"))
         #expect(disableJSON["activeTrackIds"] == .array([]))
+        #expect(disableJSON["mediaSessionId"] == .number(77))
         #expect(disableJSON["requestId"] == .number(2))
     }
 
     @Test("media controller throws without current app transport id")
-    func mediaControllerRequiresCurrentTransportID() async {
+    func mediaControllerRequiresCurrentTransportID() async throws {
         let transport = RecordingCommandTransport()
         let dispatcher = CastCommandDispatcher(transport: transport)
         let mediaController = CastMediaController(dispatcher: dispatcher)
-        let item = CastMediaItem(
-            contentURL: URL(string: "https://example.com/a.mp4")!,
+        let item = try CastMediaItem(
+            contentURL: #require(URL(string: "https://example.com/a.mp4")),
             contentType: "video/mp4"
         )
 
         await #expect(throws: CastError.self) {
             _ = try await mediaController.load(item)
+        }
+    }
+
+    @Test("media controller sends session-bound playback commands with media session id")
+    func mediaControllerPlaybackCommands() async throws {
+        let transport = RecordingCommandTransport()
+        let dispatcher = CastCommandDispatcher(transport: transport)
+        await dispatcher.setCurrentApplicationTransportID("web-42")
+        let mediaController = CastMediaController(dispatcher: dispatcher)
+        await mediaController.setMediaSessionID(55)
+
+        _ = try await mediaController.play()
+        _ = try await mediaController.pause()
+        _ = try await mediaController.seek(to: 120, resume: true)
+        _ = try await mediaController.setPlaybackRate(1.25)
+        _ = try await mediaController.stop()
+
+        let commands = await transport.commands()
+        #expect(commands.count == 5)
+
+        let jsons = try commands.map { try decodeJSON($0.payloadUTF8) }
+        #expect(jsons[0]["type"] == .string("PLAY"))
+        #expect(jsons[1]["type"] == .string("PAUSE"))
+        #expect(jsons[2]["type"] == .string("SEEK"))
+        #expect(jsons[2]["currentTime"] == .number(120))
+        #expect(jsons[2]["resumeState"] == .string("PLAYBACK_START"))
+        #expect(jsons[3]["type"] == .string("SET_PLAYBACK_RATE"))
+        #expect(jsons[3]["playbackRate"] == .number(1.25))
+        #expect(jsons[4]["type"] == .string("STOP"))
+
+        for json in jsons {
+            #expect(json["mediaSessionId"] == .number(55))
+        }
+    }
+
+    @Test("media controller session-bound commands require media session id")
+    func mediaControllerRequiresMediaSessionID() async throws {
+        let transport = RecordingCommandTransport()
+        let dispatcher = CastCommandDispatcher(transport: transport)
+        await dispatcher.setCurrentApplicationTransportID("web-42")
+        let mediaController = CastMediaController(dispatcher: dispatcher)
+
+        await #expect(throws: CastError.self) {
+            _ = try await mediaController.play()
+        }
+        await #expect(throws: CastError.self) {
+            _ = try await mediaController.disableTextTracks()
         }
     }
 
@@ -91,7 +140,7 @@ struct CastControllersTests {
 }
 
 private actor RecordingCommandTransport: CastCommandTransport {
-    private var sentCommands: [CastEncodedCommand] = []
+    private var sentCommands = [CastEncodedCommand]()
 
     func send(_ command: CastEncodedCommand) async throws {
         sentCommands.append(command)
@@ -101,4 +150,3 @@ private actor RecordingCommandTransport: CastCommandTransport {
         sentCommands
     }
 }
-

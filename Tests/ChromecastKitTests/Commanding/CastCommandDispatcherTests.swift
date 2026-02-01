@@ -3,8 +3,8 @@
 //  Swift package for Google Cast (Chromecast).
 //
 
-import Foundation
 import Testing
+import Foundation
 @testable import ChromecastKit
 
 @Suite("Cast Command Dispatcher")
@@ -79,8 +79,16 @@ struct CastCommandDispatcherTests {
         let transport = RecordingCommandTransport()
         let dispatcher = CastCommandDispatcher(transport: transport)
 
-        _ = try await dispatcher.send(namespace: .receiver, target: .platform, payload: CastReceiverPayloadBuilder.getStatus())
-        _ = try await dispatcher.send(namespace: .receiver, target: .platform, payload: CastReceiverPayloadBuilder.getStatus())
+        _ = try await dispatcher.send(
+            namespace: .receiver,
+            target: .platform,
+            payload: CastReceiverPayloadBuilder.getStatus()
+        )
+        _ = try await dispatcher.send(
+            namespace: .receiver,
+            target: .platform,
+            payload: CastReceiverPayloadBuilder.getStatus()
+        )
 
         let commands = await transport.commands()
         #expect(commands.map(\.requestID) == [1, 2])
@@ -88,7 +96,7 @@ struct CastCommandDispatcherTests {
 }
 
 private actor RecordingCommandTransport: CastCommandTransport {
-    private var sentCommands: [CastEncodedCommand] = []
+    private var sentCommands = [CastEncodedCommand]()
 
     func send(_ command: CastEncodedCommand) async throws {
         sentCommands.append(command)
@@ -98,4 +106,3 @@ private actor RecordingCommandTransport: CastCommandTransport {
         sentCommands
     }
 }
-
