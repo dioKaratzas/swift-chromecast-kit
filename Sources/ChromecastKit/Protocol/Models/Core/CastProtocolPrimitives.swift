@@ -115,3 +115,12 @@ public enum CastMediaMessageType: String, Sendable, Hashable, Codable {
     case queueReorder = "QUEUE_REORDER"
     case queueUpdate = "QUEUE_UPDATE"
 }
+
+/// Common Cast receiver protocol message types used by the platform receiver namespace.
+public enum CastReceiverMessageType: String, Sendable, Hashable, Codable {
+    case getStatus = "GET_STATUS"
+    case launch = "LAUNCH"
+    case stop = "STOP"
+    case setVolume = "SET_VOLUME"
+    case getAppAvailability = "GET_APP_AVAILABILITY"
+}
