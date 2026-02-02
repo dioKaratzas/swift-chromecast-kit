@@ -101,6 +101,7 @@ public struct CastRequestIDGenerator: Sendable, Hashable, Codable {
 
 /// Common Cast media protocol message types used by the default media receiver.
 public enum CastMediaMessageType: String, Sendable, Hashable, Codable {
+    case mediaStatus = "MEDIA_STATUS"
     case getStatus = "GET_STATUS"
     case load = "LOAD"
     case pause = "PAUSE"
@@ -118,6 +119,7 @@ public enum CastMediaMessageType: String, Sendable, Hashable, Codable {
 
 /// Common Cast receiver protocol message types used by the platform receiver namespace.
 public enum CastReceiverMessageType: String, Sendable, Hashable, Codable {
+    case receiverStatus = "RECEIVER_STATUS"
     case getStatus = "GET_STATUS"
     case launch = "LAUNCH"
     case stop = "STOP"

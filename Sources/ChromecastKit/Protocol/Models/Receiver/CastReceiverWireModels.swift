@@ -97,3 +97,80 @@ public extension CastWire.Receiver {
         }
     }
 }
+
+public extension CastWire.Receiver {
+    /// Wire response for `RECEIVER_STATUS`.
+    struct StatusResponse: Sendable, Hashable, Codable {
+        public let type: CastReceiverMessageType
+        public let status: Status
+
+        public init(
+            type: CastReceiverMessageType = .receiverStatus,
+            status: Status
+        ) {
+            self.type = type
+            self.status = status
+        }
+    }
+}
+
+public extension CastWire.Receiver {
+    /// Wire receiver status payload.
+    struct Status: Sendable, Hashable, Codable {
+        public let volume: Volume
+        public let applications: [Application]?
+        public let isStandBy: Bool?
+        public let isActiveInput: Bool?
+
+        public init(
+            volume: Volume,
+            applications: [Application]? = nil,
+            isStandBy: Bool? = nil,
+            isActiveInput: Bool? = nil
+        ) {
+            self.volume = volume
+            self.applications = applications
+            self.isStandBy = isStandBy
+            self.isActiveInput = isActiveInput
+        }
+    }
+}
+
+public extension CastWire.Receiver {
+    /// Wire receiver application entry.
+    struct Application: Sendable, Hashable, Codable {
+        public let appId: CastAppID
+        public let displayName: String
+        public let sessionId: CastAppSessionID?
+        public let transportId: CastTransportID?
+        public let statusText: String?
+        public let namespaces: [ApplicationNamespace]?
+
+        public init(
+            appId: CastAppID,
+            displayName: String,
+            sessionId: CastAppSessionID? = nil,
+            transportId: CastTransportID? = nil,
+            statusText: String? = nil,
+            namespaces: [ApplicationNamespace]? = nil
+        ) {
+            self.appId = appId
+            self.displayName = displayName
+            self.sessionId = sessionId
+            self.transportId = transportId
+            self.statusText = statusText
+            self.namespaces = namespaces
+        }
+    }
+}
+
+public extension CastWire.Receiver {
+    /// Wire namespace entry advertised by an app in receiver status.
+    struct ApplicationNamespace: Sendable, Hashable, Codable {
+        public let name: String
+
+        public init(name: String) {
+            self.name = name
+        }
+    }
+}
