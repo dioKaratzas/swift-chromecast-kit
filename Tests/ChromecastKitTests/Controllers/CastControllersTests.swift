@@ -119,6 +119,39 @@ struct CastControllersTests {
         }
     }
 
+    @Test("media controller sends queue commands through current app transport")
+    func mediaControllerQueueCommands() async throws {
+        let transport = RecordingCommandTransport()
+        let dispatcher = CastCommandDispatcher(transport: transport)
+        await dispatcher.setCurrentApplicationTransportID("web-42")
+        let mediaController = CastMediaController(dispatcher: dispatcher)
+        await mediaController.setMediaSessionID(55)
+
+        let mediaURL = try #require(URL(string: "https://example.com/movie.mp4"))
+        let queueItem = CastQueueItem(media: .init(contentURL: mediaURL, contentType: "video/mp4"))
+
+        _ = try await mediaController.queueLoad(items: [queueItem], options: .init(repeatMode: .all))
+        _ = try await mediaController.queueInsert(items: [queueItem], options: .init(insertBeforeItemID: 11))
+        _ = try await mediaController.queueRemove(itemIDs: [11, 12])
+        _ = try await mediaController.queueReorder(itemIDs: [12, 13], options: .init(insertBeforeItemID: 20))
+        _ = try await mediaController.queueUpdate(options: .init(jump: 1))
+
+        let commands = await transport.commands()
+        #expect(commands.count == 5)
+
+        let jsons = try commands.map { try decodeJSON($0.payloadUTF8) }
+        #expect(jsons[0]["type"] == .string("QUEUE_LOAD"))
+        #expect(jsons[0]["repeatMode"] == .string("REPEAT_ALL"))
+        #expect(jsons[1]["type"] == .string("QUEUE_INSERT"))
+        #expect(jsons[1]["mediaSessionId"] == .number(55))
+        #expect(jsons[2]["type"] == .string("QUEUE_REMOVE"))
+        #expect(jsons[2]["itemIds"] == .array([.number(11), .number(12)]))
+        #expect(jsons[3]["type"] == .string("QUEUE_REORDER"))
+        #expect(jsons[3]["insertBefore"] == .number(20))
+        #expect(jsons[4]["type"] == .string("QUEUE_UPDATE"))
+        #expect(jsons[4]["jump"] == .number(1))
+    }
+
     @Test("media controller session-bound commands require media session id")
     func mediaControllerRequiresMediaSessionID() async throws {
         let transport = RecordingCommandTransport()

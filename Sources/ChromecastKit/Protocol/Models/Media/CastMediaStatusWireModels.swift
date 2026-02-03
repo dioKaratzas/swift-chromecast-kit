@@ -32,6 +32,9 @@ public extension CastWire.Media {
         public let supportedMediaCommands: UInt64?
         public let volume: ReceiverVolume?
         public let activeTrackIds: [CastMediaTrackID]?
+        public let currentItemId: CastQueueItemID?
+        public let loadingItemId: CastQueueItemID?
+        public let repeatMode: CastQueueRepeatMode?
         public let media: StatusMedia?
 
         public init(
@@ -43,6 +46,9 @@ public extension CastWire.Media {
             supportedMediaCommands: UInt64? = nil,
             volume: ReceiverVolume? = nil,
             activeTrackIds: [CastMediaTrackID]? = nil,
+            currentItemId: CastQueueItemID? = nil,
+            loadingItemId: CastQueueItemID? = nil,
+            repeatMode: CastQueueRepeatMode? = nil,
             media: StatusMedia? = nil
         ) {
             self.mediaSessionId = mediaSessionId
@@ -53,6 +59,9 @@ public extension CastWire.Media {
             self.supportedMediaCommands = supportedMediaCommands
             self.volume = volume
             self.activeTrackIds = activeTrackIds
+            self.currentItemId = currentItemId
+            self.loadingItemId = loadingItemId
+            self.repeatMode = repeatMode
             self.media = media
         }
     }

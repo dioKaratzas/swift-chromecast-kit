@@ -3,8 +3,8 @@
 //  Swift package for Google Cast (Chromecast).
 //
 
-import Foundation
 import Testing
+import Foundation
 @testable import ChromecastKit
 
 @Suite("Cast Status Message Processor")
@@ -62,7 +62,7 @@ struct CastStatusMessageProcessorTests {
         let message = CastInboundMessage(
             route: .init(sourceID: "web-42", destinationID: "sender-0", namespace: .media),
             payloadUTF8: #"""
-            {"type":"MEDIA_STATUS","status":[{"mediaSessionId":55,"playerState":"PLAYING","currentTime":12,"playbackRate":1,"supportedMediaCommands":4098,"volume":{"level":0.7,"muted":false},"activeTrackIds":[3],"media":{"contentId":"https://example.com/movie.mp4","contentType":"video/mp4","streamType":"BUFFERED","duration":120,"metadata":{"metadataType":0,"title":"Movie","subtitle":"Demo","images":[{"url":"https://example.com/poster.jpg"}]},"tracks":[{"trackId":3,"type":"TEXT","name":"English","language":"en-US","trackContentId":"https://example.com/en.vtt","trackContentType":"text/vtt","subtype":"SUBTITLES"}]}}]}
+            {"type":"MEDIA_STATUS","status":[{"mediaSessionId":55,"playerState":"PLAYING","currentTime":12,"playbackRate":1,"supportedMediaCommands":4098,"volume":{"level":0.7,"muted":false},"activeTrackIds":[3],"currentItemId":10,"loadingItemId":11,"repeatMode":"REPEAT_ALL","media":{"contentId":"https://example.com/movie.mp4","contentType":"video/mp4","streamType":"BUFFERED","duration":120,"metadata":{"metadataType":0,"title":"Movie","subtitle":"Demo","images":[{"url":"https://example.com/poster.jpg"}]},"tracks":[{"trackId":3,"type":"TEXT","name":"English","language":"en-US","trackContentId":"https://example.com/en.vtt","trackContentType":"text/vtt","subtype":"SUBTITLES"}]}}]}
             """#
         )
 
@@ -75,8 +75,17 @@ struct CastStatusMessageProcessorTests {
         #expect(mediaStatus.currentTime == 12)
         #expect(mediaStatus.volume.level == 0.7)
         #expect(mediaStatus.activeTextTrackIDs == [3])
+        #expect(mediaStatus.queueCurrentItemID == 10)
+        #expect(mediaStatus.queueLoadingItemID == 11)
+        #expect(mediaStatus.queueRepeatMode == .all)
         #expect(mediaStatus.contentType == "video/mp4")
-        #expect(mediaStatus.metadata == .generic(title: "Movie", subtitle: "Demo", images: [.init(url: try #require(URL(string: "https://example.com/poster.jpg")))]))
+        #expect(
+            try mediaStatus.metadata == .generic(
+                title: "Movie",
+                subtitle: "Demo",
+                images: [.init(url: #require(URL(string: "https://example.com/poster.jpg")))]
+            )
+        )
         #expect(mediaStatus.textTracks.first?.id == 3)
 
         _ = try await mediaController.play()

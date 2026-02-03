@@ -30,6 +30,97 @@ public enum CastMediaPayloadBuilder {
         }
     }
 
+    /// Options used to build a Cast `QUEUE_LOAD` request.
+    public struct QueueLoadOptions: Sendable, Hashable, Codable {
+        public var startIndex: Int?
+        public var repeatMode: CastQueueRepeatMode?
+        public var currentTime: TimeInterval?
+        public var customData: JSONValue?
+
+        public init(
+            startIndex: Int? = nil,
+            repeatMode: CastQueueRepeatMode? = nil,
+            currentTime: TimeInterval? = nil,
+            customData: JSONValue? = nil
+        ) {
+            self.startIndex = startIndex
+            self.repeatMode = repeatMode
+            self.currentTime = currentTime
+            self.customData = customData
+        }
+    }
+
+    /// Options used to build a session-bound `QUEUE_INSERT` request.
+    public struct QueueInsertOptions: Sendable, Hashable, Codable {
+        public var currentItemID: CastQueueItemID?
+        public var currentItemIndex: Int?
+        public var currentTime: TimeInterval?
+        public var insertBeforeItemID: CastQueueItemID?
+
+        public init(
+            currentItemID: CastQueueItemID? = nil,
+            currentItemIndex: Int? = nil,
+            currentTime: TimeInterval? = nil,
+            insertBeforeItemID: CastQueueItemID? = nil
+        ) {
+            self.currentItemID = currentItemID
+            self.currentItemIndex = currentItemIndex
+            self.currentTime = currentTime
+            self.insertBeforeItemID = insertBeforeItemID
+        }
+    }
+
+    /// Options used to build a session-bound `QUEUE_REMOVE` request.
+    public struct QueueRemoveOptions: Sendable, Hashable, Codable {
+        public var currentItemID: CastQueueItemID?
+        public var currentTime: TimeInterval?
+
+        public init(
+            currentItemID: CastQueueItemID? = nil,
+            currentTime: TimeInterval? = nil
+        ) {
+            self.currentItemID = currentItemID
+            self.currentTime = currentTime
+        }
+    }
+
+    /// Options used to build a session-bound `QUEUE_REORDER` request.
+    public struct QueueReorderOptions: Sendable, Hashable, Codable {
+        public var currentItemID: CastQueueItemID?
+        public var currentTime: TimeInterval?
+        public var insertBeforeItemID: CastQueueItemID?
+
+        public init(
+            currentItemID: CastQueueItemID? = nil,
+            currentTime: TimeInterval? = nil,
+            insertBeforeItemID: CastQueueItemID? = nil
+        ) {
+            self.currentItemID = currentItemID
+            self.currentTime = currentTime
+            self.insertBeforeItemID = insertBeforeItemID
+        }
+    }
+
+    /// Options used to build a session-bound `QUEUE_UPDATE` request.
+    public struct QueueUpdateOptions: Sendable, Hashable, Codable {
+        public var currentItemID: CastQueueItemID?
+        public var currentTime: TimeInterval?
+        public var jump: Int?
+        public var repeatMode: CastQueueRepeatMode?
+
+        public init(
+            currentItemID: CastQueueItemID? = nil,
+            currentTime: TimeInterval? = nil,
+            jump: Int? = nil,
+            repeatMode: CastQueueRepeatMode? = nil
+        ) {
+            self.currentItemID = currentItemID
+            self.currentTime = currentTime
+            self.jump = jump
+            self.repeatMode = repeatMode
+        }
+    }
+
     /// Builds a typed `LOAD` request for the default media receiver.
     public static func load(
         item: CastMediaItem,
@@ -41,6 +132,20 @@ public enum CastMediaPayloadBuilder {
             currentTime: options.startTime,
             activeTrackIds: options.activeTextTrackIDs.isEmpty ? nil : options.activeTextTrackIDs,
             customData: options.customData ?? .object([:])
+        )
+    }
+
+    /// Builds a `QUEUE_LOAD` request for queue playback.
+    public static func queueLoad(
+        items: [CastQueueItem],
+        options: QueueLoadOptions = .init()
+    ) -> CastWire.Media.QueueLoadRequest {
+        .init(
+            items: items.map(wireQueueItem(from:)),
+            startIndex: options.startIndex,
+            repeatMode: options.repeatMode,
+            currentTime: options.currentTime,
+            customData: options.customData
         )
     }
 
@@ -62,6 +167,67 @@ public enum CastMediaPayloadBuilder {
     /// Builds a media `GET_STATUS` request.
     public static func getStatus() -> CastWire.Media.GetStatusRequest {
         .init()
+    }
+
+    /// Builds a session-bound `QUEUE_INSERT` request.
+    public static func queueInsert(
+        items: [CastQueueItem],
+        mediaSessionID: CastMediaSessionID,
+        options: QueueInsertOptions = .init()
+    ) -> CastWire.Media.QueueInsertRequest {
+        .init(
+            mediaSessionId: mediaSessionID,
+            currentItemId: options.currentItemID,
+            currentItemIndex: options.currentItemIndex,
+            currentTime: options.currentTime,
+            insertBefore: options.insertBeforeItemID,
+            items: items.map(wireQueueItem(from:))
+        )
+    }
+
+    /// Builds a session-bound `QUEUE_REMOVE` request.
+    public static func queueRemove(
+        itemIDs: [CastQueueItemID],
+        mediaSessionID: CastMediaSessionID,
+        options: QueueRemoveOptions = .init()
+    ) -> CastWire.Media.QueueRemoveRequest {
+        .init(
+            mediaSessionId: mediaSessionID,
+            currentItemId: options.currentItemID,
+            currentTime: options.currentTime,
+            itemIds: itemIDs
+        )
+    }
+
+    /// Builds a session-bound `QUEUE_REORDER` request.
+    public static func queueReorder(
+        itemIDs: [CastQueueItemID],
+        mediaSessionID: CastMediaSessionID,
+        options: QueueReorderOptions = .init()
+    ) -> CastWire.Media.QueueReorderRequest {
+        .init(
+            mediaSessionId: mediaSessionID,
+            currentItemId: options.currentItemID,
+            currentTime: options.currentTime,
+            insertBefore: options.insertBeforeItemID,
+            itemIds: itemIDs
+        )
+    }
+
+    /// Builds a session-bound `QUEUE_UPDATE` request.
+    public static func queueUpdate(
+        items: [CastQueueItem]? = nil,
+        mediaSessionID: CastMediaSessionID,
+        options: QueueUpdateOptions = .init()
+    ) -> CastWire.Media.QueueUpdateRequest {
+        .init(
+            mediaSessionId: mediaSessionID,
+            currentItemId: options.currentItemID,
+            currentTime: options.currentTime,
+            jump: options.jump,
+            repeatMode: options.repeatMode,
+            items: items?.map(wireQueueItem(from:))
+        )
     }
 
     /// Builds a media `PLAY` request.
@@ -212,6 +378,18 @@ public enum CastMediaPayloadBuilder {
             trackContentId: track.contentURL.absoluteString,
             trackContentType: track.contentType,
             subtype: track.subtype
+        )
+    }
+
+    private static func wireQueueItem(from item: CastQueueItem) -> CastWire.Media.QueueItem {
+        .init(
+            itemId: item.itemID,
+            media: mediaInformation(from: item.media),
+            autoplay: item.autoplay,
+            startTime: item.startTime,
+            preloadTime: item.preloadTime,
+            activeTrackIds: item.activeTextTrackIDs.isEmpty ? nil : item.activeTextTrackIDs,
+            customData: item.customData
         )
     }
 

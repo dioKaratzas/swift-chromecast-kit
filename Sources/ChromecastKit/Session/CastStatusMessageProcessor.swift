@@ -103,6 +103,9 @@ private func mapMediaStatus(_ status: CastWire.Media.Status) -> CastMediaStatus 
         metadata: metadata,
         textTracks: tracks,
         activeTextTrackIDs: status.activeTrackIds ?? [],
+        queueCurrentItemID: status.currentItemId,
+        queueLoadingItemID: status.loadingItemId,
+        queueRepeatMode: status.repeatMode,
         volume: .init(level: status.volume?.level ?? 1, muted: status.volume?.muted ?? false),
         supportedCommands: .init(rawValue: status.supportedMediaCommands ?? 0),
         lastUpdated: Date()
@@ -111,7 +114,9 @@ private func mapMediaStatus(_ status: CastWire.Media.Status) -> CastMediaStatus 
 
 private func mapMediaMetadata(_ metadata: CastWire.Media.Metadata) -> CastMediaMetadata? {
     let images = metadata.images?.compactMap { image -> CastImage? in
-        guard let url = URL(string: image.url) else { return nil }
+        guard let url = URL(string: image.url) else {
+            return nil
+        }
         return .init(url: url, width: image.width, height: image.height)
     } ?? []
 

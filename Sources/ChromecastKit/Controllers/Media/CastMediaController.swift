@@ -47,6 +47,19 @@ public actor CastMediaController {
         )
     }
 
+    /// Loads a media queue into the active media receiver/app transport.
+    @discardableResult
+    public func queueLoad(
+        items: [CastQueueItem],
+        options: CastMediaPayloadBuilder.QueueLoadOptions = .init()
+    ) async throws -> CastRequestID {
+        try await dispatcher.send(
+            namespace: .media,
+            target: .currentApplication,
+            payload: CastMediaPayloadBuilder.queueLoad(items: items, options: options)
+        )
+    }
+
     /// Enables a text track by Cast track ID.
     @discardableResult
     public func enableTextTrack(id: CastMediaTrackID) async throws -> CastRequestID {
@@ -135,6 +148,70 @@ public actor CastMediaController {
             namespace: .media,
             target: .currentApplication,
             payload: CastMediaPayloadBuilder.setPlaybackRate(rate, mediaSessionID: mediaSessionID)
+        )
+    }
+
+    /// Inserts queue items into the current media session queue.
+    @discardableResult
+    public func queueInsert(
+        items: [CastQueueItem],
+        options: CastMediaPayloadBuilder.QueueInsertOptions = .init()
+    ) async throws -> CastRequestID {
+        let mediaSessionID = try requireMediaSessionID()
+        return try await dispatcher.send(
+            namespace: .media,
+            target: .currentApplication,
+            payload: CastMediaPayloadBuilder.queueInsert(items: items, mediaSessionID: mediaSessionID, options: options)
+        )
+    }
+
+    /// Removes queue items from the current media session queue.
+    @discardableResult
+    public func queueRemove(
+        itemIDs: [CastQueueItemID],
+        options: CastMediaPayloadBuilder.QueueRemoveOptions = .init()
+    ) async throws -> CastRequestID {
+        let mediaSessionID = try requireMediaSessionID()
+        return try await dispatcher.send(
+            namespace: .media,
+            target: .currentApplication,
+            payload: CastMediaPayloadBuilder.queueRemove(
+                itemIDs: itemIDs,
+                mediaSessionID: mediaSessionID,
+                options: options
+            )
+        )
+    }
+
+    /// Reorders queue items in the current media session queue.
+    @discardableResult
+    public func queueReorder(
+        itemIDs: [CastQueueItemID],
+        options: CastMediaPayloadBuilder.QueueReorderOptions = .init()
+    ) async throws -> CastRequestID {
+        let mediaSessionID = try requireMediaSessionID()
+        return try await dispatcher.send(
+            namespace: .media,
+            target: .currentApplication,
+            payload: CastMediaPayloadBuilder.queueReorder(
+                itemIDs: itemIDs,
+                mediaSessionID: mediaSessionID,
+                options: options
+            )
+        )
+    }
+
+    /// Updates queue state or items in the current media session queue.
+    @discardableResult
+    public func queueUpdate(
+        items: [CastQueueItem]? = nil,
+        options: CastMediaPayloadBuilder.QueueUpdateOptions = .init()
+    ) async throws -> CastRequestID {
+        let mediaSessionID = try requireMediaSessionID()
+        return try await dispatcher.send(
+            namespace: .media,
+            target: .currentApplication,
+            payload: CastMediaPayloadBuilder.queueUpdate(items: items, mediaSessionID: mediaSessionID, options: options)
         )
     }
 

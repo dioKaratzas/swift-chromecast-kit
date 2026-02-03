@@ -369,6 +369,43 @@ public struct CastMediaItem: Sendable, Hashable, Codable {
     }
 }
 
+/// Queue repeat behavior supported by the Cast media queue APIs.
+public enum CastQueueRepeatMode: String, Sendable, Hashable, Codable {
+    case off = "REPEAT_OFF"
+    case all = "REPEAT_ALL"
+    case single = "REPEAT_SINGLE"
+    case allAndShuffle = "REPEAT_ALL_AND_SHUFFLE"
+}
+
+/// A queue entry for Cast queue load/insert/update commands.
+public struct CastQueueItem: Sendable, Hashable, Codable {
+    public var itemID: CastQueueItemID?
+    public var media: CastMediaItem
+    public var autoplay: Bool?
+    public var startTime: TimeInterval?
+    public var preloadTime: TimeInterval?
+    public var activeTextTrackIDs: [CastMediaTrackID]
+    public var customData: JSONValue?
+
+    public init(
+        itemID: CastQueueItemID? = nil,
+        media: CastMediaItem,
+        autoplay: Bool? = nil,
+        startTime: TimeInterval? = nil,
+        preloadTime: TimeInterval? = nil,
+        activeTextTrackIDs: [CastMediaTrackID] = [],
+        customData: JSONValue? = nil
+    ) {
+        self.itemID = itemID
+        self.media = media
+        self.autoplay = autoplay
+        self.startTime = startTime
+        self.preloadTime = preloadTime
+        self.activeTextTrackIDs = activeTextTrackIDs
+        self.customData = customData
+    }
+}
+
 /// Playback state reported by the Cast media channel.
 public enum CastPlayerState: String, Sendable, Hashable, Codable {
     case playing = "PLAYING"
@@ -431,6 +468,9 @@ public struct CastMediaStatus: Sendable, Hashable, Codable {
     public let metadata: CastMediaMetadata?
     public let textTracks: [CastTextTrack]
     public let activeTextTrackIDs: [CastMediaTrackID]
+    public let queueCurrentItemID: CastQueueItemID?
+    public let queueLoadingItemID: CastQueueItemID?
+    public let queueRepeatMode: CastQueueRepeatMode?
     public let volume: CastVolumeStatus
     public let supportedCommands: CastMediaCommandSet
     public let lastUpdated: Date
@@ -448,6 +488,9 @@ public struct CastMediaStatus: Sendable, Hashable, Codable {
         metadata: CastMediaMetadata? = nil,
         textTracks: [CastTextTrack] = [],
         activeTextTrackIDs: [CastMediaTrackID] = [],
+        queueCurrentItemID: CastQueueItemID? = nil,
+        queueLoadingItemID: CastQueueItemID? = nil,
+        queueRepeatMode: CastQueueRepeatMode? = nil,
         volume: CastVolumeStatus = .init(level: 1, muted: false),
         supportedCommands: CastMediaCommandSet = [],
         lastUpdated: Date = Date()
@@ -464,6 +507,9 @@ public struct CastMediaStatus: Sendable, Hashable, Codable {
         self.metadata = metadata
         self.textTracks = textTracks
         self.activeTextTrackIDs = activeTextTrackIDs
+        self.queueCurrentItemID = queueCurrentItemID
+        self.queueLoadingItemID = queueLoadingItemID
+        self.queueRepeatMode = queueRepeatMode
         self.volume = volume
         self.supportedCommands = supportedCommands
         self.lastUpdated = lastUpdated

@@ -6,7 +6,7 @@
 import Foundation
 
 /// Stable identifier for a Cast device in local discovery and cached state.
-public struct CastDeviceID: Sendable, Hashable, Codable, RawRepresentable {
+public struct CastDeviceID: Sendable, Hashable, Codable, RawRepresentable, ExpressibleByStringLiteral {
     public let rawValue: String
 
     public init(rawValue: String) {
@@ -15,6 +15,10 @@ public struct CastDeviceID: Sendable, Hashable, Codable, RawRepresentable {
 
     public init(_ rawValue: String) {
         self.rawValue = rawValue
+    }
+
+    public init(stringLiteral value: String) {
+        self.rawValue = value
     }
 }
 

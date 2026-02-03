@@ -86,6 +86,33 @@ public struct CastMediaTrackID: Sendable, Hashable, Codable, RawRepresentable, E
     }
 }
 
+/// Queue item identifier assigned by the Cast media channel.
+public struct CastQueueItemID: Sendable, Hashable, Codable, RawRepresentable, ExpressibleByIntegerLiteral {
+    public let rawValue: Int
+
+    public init(rawValue: Int) {
+        self.rawValue = rawValue
+    }
+
+    public init(_ rawValue: Int) {
+        self.rawValue = rawValue
+    }
+
+    public init(integerLiteral value: Int) {
+        self.rawValue = value
+    }
+
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        self.rawValue = try container.decode(Int.self)
+    }
+
+    public func encode(to encoder: any Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(rawValue)
+    }
+}
+
 /// Receiver app identifier (for example `CC1AD845` for the default media receiver).
 public struct CastAppID: Sendable, Hashable, Codable, RawRepresentable, ExpressibleByStringLiteral {
     public let rawValue: String
