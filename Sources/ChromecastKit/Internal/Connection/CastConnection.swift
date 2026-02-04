@@ -15,8 +15,8 @@ protocol CastConnectionTransport: Sendable {
 /// This type serializes connection transitions and event fan-out. Transport/socket
 /// implementation details are injected behind an internal transport protocol so the
 /// state machine can be tested independently.
-public actor CastConnection {
-    public let configuration: CastConnectionConfiguration
+actor CastConnection {
+    let configuration: CastConnectionConfiguration
 
     private var stateValue = CastConnectionState.disconnected
     private var eventContinuations = [UUID: AsyncStream<CastConnectionEvent>.Continuation]()
@@ -31,14 +31,14 @@ public actor CastConnection {
     }
 
     /// Returns the current connection state snapshot.
-    public func state() -> CastConnectionState {
+    func state() -> CastConnectionState {
         stateValue
     }
 
     /// Subscribes to connection lifecycle events.
     ///
     /// The returned stream is multi-subscriber and cancellation-aware.
-    public func events() -> AsyncStream<CastConnectionEvent> {
+    func events() -> AsyncStream<CastConnectionEvent> {
         let id = UUID()
 
         return AsyncStream { continuation in
@@ -50,7 +50,7 @@ public actor CastConnection {
     }
 
     /// Connects the underlying transport and transitions the connection state.
-    public func connect() async throws {
+    func connect() async throws {
         switch stateValue {
         case .connected, .connecting:
             return
@@ -73,14 +73,14 @@ public actor CastConnection {
     }
 
     /// Disconnects the underlying transport and emits a disconnection event.
-    public func disconnect(reason: CastDisconnectReason = .requested) async {
+    func disconnect(reason: CastDisconnectReason = .requested) async {
         await transport.disconnect()
         stateValue = .disconnected
         emit(.disconnected(reason: reason))
     }
 
     /// Reconnects the underlying transport and emits a reconnection event on success.
-    public func reconnect() async throws {
+    func reconnect() async throws {
         stateValue = .reconnecting
         await transport.disconnect()
 

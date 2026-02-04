@@ -195,27 +195,27 @@ public struct CastTransportID: Sendable, Hashable, Codable, RawRepresentable, Ex
 }
 
 /// Cast route endpoint identifier (for example `sender-0`, `receiver-0`, or an app transport ID).
-public struct CastEndpointID: Sendable, Hashable, Codable, RawRepresentable, ExpressibleByStringLiteral {
-    public let rawValue: String
+struct CastEndpointID: Sendable, Hashable, Codable, RawRepresentable, ExpressibleByStringLiteral {
+    let rawValue: String
 
-    public init(rawValue: String) {
+    init(rawValue: String) {
         self.rawValue = rawValue
     }
 
-    public init(_ rawValue: String) {
+    init(_ rawValue: String) {
         self.rawValue = rawValue
     }
 
-    public init(stringLiteral value: String) {
+    init(stringLiteral value: String) {
         self.rawValue = value
     }
 
-    public init(from decoder: any Decoder) throws {
+    init(from decoder: any Decoder) throws {
         let container = try decoder.singleValueContainer()
         self.rawValue = try container.decode(String.self)
     }
 
-    public func encode(to encoder: any Encoder) throws {
+    func encode(to encoder: any Encoder) throws {
         var container = encoder.singleValueContainer()
         try container.encode(rawValue)
     }

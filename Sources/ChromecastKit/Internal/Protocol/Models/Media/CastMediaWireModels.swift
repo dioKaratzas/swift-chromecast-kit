@@ -6,12 +6,12 @@
 import Foundation
 
 /// Namespace for Cast protocol wire-level models.
-public enum CastWire {
+enum CastWire {
     /// Namespace for Cast media namespace wire-level request and payload models.
-    public enum Media {}
+    enum Media {}
 }
 
-public extension CastWire.Media {
+extension CastWire.Media {
     /// Resume state behavior for `SEEK` commands.
     enum ResumeState: String, Sendable, Hashable, Codable {
         case playbackStart = "PLAYBACK_START"
@@ -19,24 +19,24 @@ public extension CastWire.Media {
     }
 }
 
-public extension CastWire.Media {
+extension CastWire.Media {
     /// Wire model for a media `GET_STATUS` request.
     struct GetStatusRequest: Sendable, Hashable, Codable {
-        public let type: CastMediaMessageType
+        let type: CastMediaMessageType
 
-        public init(type: CastMediaMessageType = .getStatus) {
+        init(type: CastMediaMessageType = .getStatus) {
             self.type = type
         }
     }
 }
 
-public extension CastWire.Media {
+extension CastWire.Media {
     /// Wire model for a media `PLAY` request.
     struct PlayRequest: Sendable, Hashable, Codable {
-        public let type: CastMediaMessageType
-        public let mediaSessionId: CastMediaSessionID
+        let type: CastMediaMessageType
+        let mediaSessionId: CastMediaSessionID
 
-        public init(
+        init(
             type: CastMediaMessageType = .play,
             mediaSessionId: CastMediaSessionID
         ) {
@@ -46,13 +46,13 @@ public extension CastWire.Media {
     }
 }
 
-public extension CastWire.Media {
+extension CastWire.Media {
     /// Wire model for a media `PAUSE` request.
     struct PauseRequest: Sendable, Hashable, Codable {
-        public let type: CastMediaMessageType
-        public let mediaSessionId: CastMediaSessionID
+        let type: CastMediaMessageType
+        let mediaSessionId: CastMediaSessionID
 
-        public init(
+        init(
             type: CastMediaMessageType = .pause,
             mediaSessionId: CastMediaSessionID
         ) {
@@ -62,13 +62,13 @@ public extension CastWire.Media {
     }
 }
 
-public extension CastWire.Media {
+extension CastWire.Media {
     /// Wire model for a media `STOP` request.
     struct StopRequest: Sendable, Hashable, Codable {
-        public let type: CastMediaMessageType
-        public let mediaSessionId: CastMediaSessionID
+        let type: CastMediaMessageType
+        let mediaSessionId: CastMediaSessionID
 
-        public init(
+        init(
             type: CastMediaMessageType = .stop,
             mediaSessionId: CastMediaSessionID
         ) {
@@ -78,15 +78,15 @@ public extension CastWire.Media {
     }
 }
 
-public extension CastWire.Media {
+extension CastWire.Media {
     /// Wire model for a media `SEEK` request.
     struct SeekRequest: Sendable, Hashable, Codable {
-        public let type: CastMediaMessageType
-        public let mediaSessionId: CastMediaSessionID
-        public let currentTime: TimeInterval
-        public let resumeState: ResumeState?
+        let type: CastMediaMessageType
+        let mediaSessionId: CastMediaSessionID
+        let currentTime: TimeInterval
+        let resumeState: ResumeState?
 
-        public init(
+        init(
             type: CastMediaMessageType = .seek,
             mediaSessionId: CastMediaSessionID,
             currentTime: TimeInterval,
@@ -100,14 +100,14 @@ public extension CastWire.Media {
     }
 }
 
-public extension CastWire.Media {
+extension CastWire.Media {
     /// Wire model for a media `SET_PLAYBACK_RATE` request.
     struct SetPlaybackRateRequest: Sendable, Hashable, Codable {
-        public let type: CastMediaMessageType
-        public let mediaSessionId: CastMediaSessionID
-        public let playbackRate: Double
+        let type: CastMediaMessageType
+        let mediaSessionId: CastMediaSessionID
+        let playbackRate: Double
 
-        public init(
+        init(
             type: CastMediaMessageType = .setPlaybackRate,
             mediaSessionId: CastMediaSessionID,
             playbackRate: Double
@@ -119,17 +119,17 @@ public extension CastWire.Media {
     }
 }
 
-public extension CastWire.Media {
+extension CastWire.Media {
     /// Wire model for a Cast media `LOAD` request.
     struct LoadRequest: Sendable, Hashable, Codable {
-        public let type: CastMediaMessageType
-        public let media: Information
-        public let autoplay: Bool
-        public let currentTime: TimeInterval?
-        public let activeTrackIds: [CastMediaTrackID]?
-        public let customData: JSONValue
+        let type: CastMediaMessageType
+        let media: Information
+        let autoplay: Bool
+        let currentTime: TimeInterval?
+        let activeTrackIds: [CastMediaTrackID]?
+        let customData: JSONValue
 
-        public init(
+        init(
             type: CastMediaMessageType = .load,
             media: Information,
             autoplay: Bool,
@@ -147,15 +147,15 @@ public extension CastWire.Media {
     }
 }
 
-public extension CastWire.Media {
+extension CastWire.Media {
     /// Wire model for a Cast `EDIT_TRACKS_INFO` request.
     struct EditTracksInfoRequest: Sendable, Hashable, Codable {
-        public let type: CastMediaMessageType
-        public let mediaSessionId: CastMediaSessionID?
-        public let activeTrackIds: [CastMediaTrackID]?
-        public let textTrackStyle: TextTrackStyle?
+        let type: CastMediaMessageType
+        let mediaSessionId: CastMediaSessionID?
+        let activeTrackIds: [CastMediaTrackID]?
+        let textTrackStyle: TextTrackStyle?
 
-        public init(
+        init(
             type: CastMediaMessageType = .editTracksInfo,
             mediaSessionId: CastMediaSessionID? = nil,
             activeTrackIds: [CastMediaTrackID]? = nil,
@@ -169,18 +169,18 @@ public extension CastWire.Media {
     }
 }
 
-public extension CastWire.Media {
+extension CastWire.Media {
     /// Wire model for Cast media information in `LOAD` requests.
     struct Information: Sendable, Hashable, Codable {
-        public let contentId: String
-        public let contentType: String
-        public let streamType: CastStreamType
-        public let metadata: Metadata
-        public let tracks: [Track]?
-        public let textTrackStyle: TextTrackStyle?
-        public let customData: JSONValue?
+        let contentId: String
+        let contentType: String
+        let streamType: CastStreamType
+        let metadata: Metadata
+        let tracks: [Track]?
+        let textTrackStyle: TextTrackStyle?
+        let customData: JSONValue?
 
-        public init(
+        init(
             contentId: String,
             contentType: String,
             streamType: CastStreamType,
@@ -200,25 +200,25 @@ public extension CastWire.Media {
     }
 }
 
-public extension CastWire.Media {
+extension CastWire.Media {
     /// Wire model for Cast media metadata.
     struct Metadata: Sendable, Hashable, Codable {
-        public let metadataType: Int
-        public let title: String?
-        public let subtitle: String?
-        public let seriesTitle: String?
-        public let season: Int?
-        public let episode: Int?
-        public let studio: String?
-        public let releaseDate: String?
-        public let artist: String?
-        public let albumName: String?
-        public let albumArtist: String?
-        public let track: Int?
-        public let location: String?
-        public let images: [Image]?
+        let metadataType: Int
+        let title: String?
+        let subtitle: String?
+        let seriesTitle: String?
+        let season: Int?
+        let episode: Int?
+        let studio: String?
+        let releaseDate: String?
+        let artist: String?
+        let albumName: String?
+        let albumArtist: String?
+        let track: Int?
+        let location: String?
+        let images: [Image]?
 
-        public init(
+        init(
             metadataType: Int,
             title: String? = nil,
             subtitle: String? = nil,
@@ -252,14 +252,14 @@ public extension CastWire.Media {
     }
 }
 
-public extension CastWire.Media {
+extension CastWire.Media {
     /// Wire model for Cast media artwork/image metadata.
     struct Image: Sendable, Hashable, Codable {
-        public let url: String
-        public let width: Int?
-        public let height: Int?
+        let url: String
+        let width: Int?
+        let height: Int?
 
-        public init(url: String, width: Int? = nil, height: Int? = nil) {
+        init(url: String, width: Int? = nil, height: Int? = nil) {
             self.url = url
             self.width = width
             self.height = height
@@ -267,18 +267,18 @@ public extension CastWire.Media {
     }
 }
 
-public extension CastWire.Media {
+extension CastWire.Media {
     /// Wire model for Cast subtitle/caption tracks.
     struct Track: Sendable, Hashable, Codable {
-        public let trackId: CastMediaTrackID
-        public let type: CastTextTrackKind
-        public let name: String
-        public let language: String
-        public let trackContentId: String
-        public let trackContentType: String
-        public let subtype: CastTextTrackSubtype?
+        let trackId: CastMediaTrackID
+        let type: CastTextTrackKind
+        let name: String
+        let language: String
+        let trackContentId: String
+        let trackContentType: String
+        let subtype: CastTextTrackSubtype?
 
-        public init(
+        init(
             trackId: CastMediaTrackID,
             type: CastTextTrackKind,
             name: String,
@@ -298,22 +298,22 @@ public extension CastWire.Media {
     }
 }
 
-public extension CastWire.Media {
+extension CastWire.Media {
     /// Wire model for text track style edits and media style configuration.
     struct TextTrackStyle: Sendable, Hashable, Codable {
-        public let backgroundColor: String?
-        public let foregroundColor: String?
-        public let edgeType: CastTextTrackEdgeType?
-        public let edgeColor: String?
-        public let fontScale: Double?
-        public let fontStyle: CastTextTrackFontStyle?
-        public let fontFamily: String?
-        public let fontGenericFamily: CastTextTrackFontGenericFamily?
-        public let windowColor: String?
-        public let windowRoundedCornerRadius: Int?
-        public let windowType: CastTextTrackWindowType?
+        let backgroundColor: String?
+        let foregroundColor: String?
+        let edgeType: CastTextTrackEdgeType?
+        let edgeColor: String?
+        let fontScale: Double?
+        let fontStyle: CastTextTrackFontStyle?
+        let fontFamily: String?
+        let fontGenericFamily: CastTextTrackFontGenericFamily?
+        let windowColor: String?
+        let windowRoundedCornerRadius: Int?
+        let windowType: CastTextTrackWindowType?
 
-        public init(
+        init(
             backgroundColor: String? = nil,
             foregroundColor: String? = nil,
             edgeType: CastTextTrackEdgeType? = nil,

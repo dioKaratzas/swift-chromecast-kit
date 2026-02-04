@@ -9,15 +9,15 @@ import Foundation
 ///
 /// `JSONValue` is used only for truly dynamic fields (for example `customData`).
 /// Standardized Cast payloads should be represented as typed wire models.
-public enum CastMediaPayloadBuilder {
+enum CastMediaPayloadBuilder {
     /// Options used to build a Cast `LOAD` media request.
-    public struct LoadOptions: Sendable, Hashable, Codable {
-        public var autoplay: Bool
-        public var startTime: TimeInterval?
-        public var activeTextTrackIDs: [CastMediaTrackID]
-        public var customData: JSONValue?
+    struct LoadOptions: Sendable, Hashable, Codable {
+        var autoplay: Bool
+        var startTime: TimeInterval?
+        var activeTextTrackIDs: [CastMediaTrackID]
+        var customData: JSONValue?
 
-        public init(
+        init(
             autoplay: Bool = true,
             startTime: TimeInterval? = nil,
             activeTextTrackIDs: [CastMediaTrackID] = [],
@@ -31,13 +31,13 @@ public enum CastMediaPayloadBuilder {
     }
 
     /// Options used to build a Cast `QUEUE_LOAD` request.
-    public struct QueueLoadOptions: Sendable, Hashable, Codable {
-        public var startIndex: Int?
-        public var repeatMode: CastQueueRepeatMode?
-        public var currentTime: TimeInterval?
-        public var customData: JSONValue?
+    struct QueueLoadOptions: Sendable, Hashable, Codable {
+        var startIndex: Int?
+        var repeatMode: CastQueueRepeatMode?
+        var currentTime: TimeInterval?
+        var customData: JSONValue?
 
-        public init(
+        init(
             startIndex: Int? = nil,
             repeatMode: CastQueueRepeatMode? = nil,
             currentTime: TimeInterval? = nil,
@@ -51,13 +51,13 @@ public enum CastMediaPayloadBuilder {
     }
 
     /// Options used to build a session-bound `QUEUE_INSERT` request.
-    public struct QueueInsertOptions: Sendable, Hashable, Codable {
-        public var currentItemID: CastQueueItemID?
-        public var currentItemIndex: Int?
-        public var currentTime: TimeInterval?
-        public var insertBeforeItemID: CastQueueItemID?
+    struct QueueInsertOptions: Sendable, Hashable, Codable {
+        var currentItemID: CastQueueItemID?
+        var currentItemIndex: Int?
+        var currentTime: TimeInterval?
+        var insertBeforeItemID: CastQueueItemID?
 
-        public init(
+        init(
             currentItemID: CastQueueItemID? = nil,
             currentItemIndex: Int? = nil,
             currentTime: TimeInterval? = nil,
@@ -71,11 +71,11 @@ public enum CastMediaPayloadBuilder {
     }
 
     /// Options used to build a session-bound `QUEUE_REMOVE` request.
-    public struct QueueRemoveOptions: Sendable, Hashable, Codable {
-        public var currentItemID: CastQueueItemID?
-        public var currentTime: TimeInterval?
+    struct QueueRemoveOptions: Sendable, Hashable, Codable {
+        var currentItemID: CastQueueItemID?
+        var currentTime: TimeInterval?
 
-        public init(
+        init(
             currentItemID: CastQueueItemID? = nil,
             currentTime: TimeInterval? = nil
         ) {
@@ -85,12 +85,12 @@ public enum CastMediaPayloadBuilder {
     }
 
     /// Options used to build a session-bound `QUEUE_REORDER` request.
-    public struct QueueReorderOptions: Sendable, Hashable, Codable {
-        public var currentItemID: CastQueueItemID?
-        public var currentTime: TimeInterval?
-        public var insertBeforeItemID: CastQueueItemID?
+    struct QueueReorderOptions: Sendable, Hashable, Codable {
+        var currentItemID: CastQueueItemID?
+        var currentTime: TimeInterval?
+        var insertBeforeItemID: CastQueueItemID?
 
-        public init(
+        init(
             currentItemID: CastQueueItemID? = nil,
             currentTime: TimeInterval? = nil,
             insertBeforeItemID: CastQueueItemID? = nil
@@ -102,13 +102,13 @@ public enum CastMediaPayloadBuilder {
     }
 
     /// Options used to build a session-bound `QUEUE_UPDATE` request.
-    public struct QueueUpdateOptions: Sendable, Hashable, Codable {
-        public var currentItemID: CastQueueItemID?
-        public var currentTime: TimeInterval?
-        public var jump: Int?
-        public var repeatMode: CastQueueRepeatMode?
+    struct QueueUpdateOptions: Sendable, Hashable, Codable {
+        var currentItemID: CastQueueItemID?
+        var currentTime: TimeInterval?
+        var jump: Int?
+        var repeatMode: CastQueueRepeatMode?
 
-        public init(
+        init(
             currentItemID: CastQueueItemID? = nil,
             currentTime: TimeInterval? = nil,
             jump: Int? = nil,
@@ -122,7 +122,7 @@ public enum CastMediaPayloadBuilder {
     }
 
     /// Builds a typed `LOAD` request for the default media receiver.
-    public static func load(
+    static func load(
         item: CastMediaItem,
         options: LoadOptions = .init()
     ) -> CastWire.Media.LoadRequest {
@@ -136,7 +136,7 @@ public enum CastMediaPayloadBuilder {
     }
 
     /// Builds a `QUEUE_LOAD` request for queue playback.
-    public static func queueLoad(
+    static func queueLoad(
         items: [CastQueueItem],
         options: QueueLoadOptions = .init()
     ) -> CastWire.Media.QueueLoadRequest {
@@ -150,27 +150,27 @@ public enum CastMediaPayloadBuilder {
     }
 
     /// Builds an `EDIT_TRACKS_INFO` request to enable one text track.
-    public static func enableTextTrack(trackID: CastMediaTrackID) -> CastWire.Media.EditTracksInfoRequest {
+    static func enableTextTrack(trackID: CastMediaTrackID) -> CastWire.Media.EditTracksInfoRequest {
         CastWire.Media.EditTracksInfoRequest(activeTrackIds: [trackID])
     }
 
     /// Builds an `EDIT_TRACKS_INFO` request to disable active text tracks.
-    public static func disableTextTracks() -> CastWire.Media.EditTracksInfoRequest {
+    static func disableTextTracks() -> CastWire.Media.EditTracksInfoRequest {
         CastWire.Media.EditTracksInfoRequest(activeTrackIds: [])
     }
 
     /// Builds an `EDIT_TRACKS_INFO` request to update text track style.
-    public static func textTrackStyle(_ style: CastTextTrackStyle) -> CastWire.Media.EditTracksInfoRequest {
+    static func textTrackStyle(_ style: CastTextTrackStyle) -> CastWire.Media.EditTracksInfoRequest {
         CastWire.Media.EditTracksInfoRequest(textTrackStyle: wireTextTrackStyle(from: style))
     }
 
     /// Builds a media `GET_STATUS` request.
-    public static func getStatus() -> CastWire.Media.GetStatusRequest {
+    static func getStatus() -> CastWire.Media.GetStatusRequest {
         .init()
     }
 
     /// Builds a session-bound `QUEUE_INSERT` request.
-    public static func queueInsert(
+    static func queueInsert(
         items: [CastQueueItem],
         mediaSessionID: CastMediaSessionID,
         options: QueueInsertOptions = .init()
@@ -186,7 +186,7 @@ public enum CastMediaPayloadBuilder {
     }
 
     /// Builds a session-bound `QUEUE_REMOVE` request.
-    public static func queueRemove(
+    static func queueRemove(
         itemIDs: [CastQueueItemID],
         mediaSessionID: CastMediaSessionID,
         options: QueueRemoveOptions = .init()
@@ -200,7 +200,7 @@ public enum CastMediaPayloadBuilder {
     }
 
     /// Builds a session-bound `QUEUE_REORDER` request.
-    public static func queueReorder(
+    static func queueReorder(
         itemIDs: [CastQueueItemID],
         mediaSessionID: CastMediaSessionID,
         options: QueueReorderOptions = .init()
@@ -215,7 +215,7 @@ public enum CastMediaPayloadBuilder {
     }
 
     /// Builds a session-bound `QUEUE_UPDATE` request.
-    public static func queueUpdate(
+    static func queueUpdate(
         items: [CastQueueItem]? = nil,
         mediaSessionID: CastMediaSessionID,
         options: QueueUpdateOptions = .init()
@@ -231,22 +231,22 @@ public enum CastMediaPayloadBuilder {
     }
 
     /// Builds a media `PLAY` request.
-    public static func play(mediaSessionID: CastMediaSessionID) -> CastWire.Media.PlayRequest {
+    static func play(mediaSessionID: CastMediaSessionID) -> CastWire.Media.PlayRequest {
         .init(mediaSessionId: mediaSessionID)
     }
 
     /// Builds a media `PAUSE` request.
-    public static func pause(mediaSessionID: CastMediaSessionID) -> CastWire.Media.PauseRequest {
+    static func pause(mediaSessionID: CastMediaSessionID) -> CastWire.Media.PauseRequest {
         .init(mediaSessionId: mediaSessionID)
     }
 
     /// Builds a media `STOP` request.
-    public static func stop(mediaSessionID: CastMediaSessionID) -> CastWire.Media.StopRequest {
+    static func stop(mediaSessionID: CastMediaSessionID) -> CastWire.Media.StopRequest {
         .init(mediaSessionId: mediaSessionID)
     }
 
     /// Builds a media `SEEK` request.
-    public static func seek(
+    static func seek(
         to time: TimeInterval,
         mediaSessionID: CastMediaSessionID,
         resume: Bool? = nil
@@ -269,7 +269,7 @@ public enum CastMediaPayloadBuilder {
     }
 
     /// Builds a media `SET_PLAYBACK_RATE` request.
-    public static func setPlaybackRate(
+    static func setPlaybackRate(
         _ rate: Double,
         mediaSessionID: CastMediaSessionID
     ) -> CastWire.Media.SetPlaybackRateRequest {
@@ -277,7 +277,7 @@ public enum CastMediaPayloadBuilder {
     }
 
     /// Builds an `EDIT_TRACKS_INFO` request to enable one text track for a media session.
-    public static func enableTextTrack(
+    static func enableTextTrack(
         trackID: CastMediaTrackID,
         mediaSessionID: CastMediaSessionID
     ) -> CastWire.Media.EditTracksInfoRequest {
@@ -285,12 +285,12 @@ public enum CastMediaPayloadBuilder {
     }
 
     /// Builds an `EDIT_TRACKS_INFO` request to disable active text tracks for a media session.
-    public static func disableTextTracks(mediaSessionID: CastMediaSessionID) -> CastWire.Media.EditTracksInfoRequest {
+    static func disableTextTracks(mediaSessionID: CastMediaSessionID) -> CastWire.Media.EditTracksInfoRequest {
         .init(mediaSessionId: mediaSessionID, activeTrackIds: [])
     }
 
     /// Builds an `EDIT_TRACKS_INFO` request to update text track style for a media session.
-    public static func textTrackStyle(
+    static func textTrackStyle(
         _ style: CastTextTrackStyle,
         mediaSessionID: CastMediaSessionID
     ) -> CastWire.Media.EditTracksInfoRequest {

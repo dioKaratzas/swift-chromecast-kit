@@ -6,39 +6,39 @@
 import Foundation
 
 /// Cast protocol namespaces used by platform and media communication.
-public struct CastNamespace: RawRepresentable, ExpressibleByStringLiteral, Sendable, Hashable, Codable {
-    public let rawValue: String
+struct CastNamespace: RawRepresentable, ExpressibleByStringLiteral, Sendable, Hashable, Codable {
+    let rawValue: String
 
-    public init(rawValue: String) {
+    init(rawValue: String) {
         self.rawValue = rawValue
     }
 
-    public init(_ rawValue: String) {
+    init(_ rawValue: String) {
         self.rawValue = rawValue
     }
 
-    public init(stringLiteral value: StringLiteralType) {
+    init(stringLiteral value: StringLiteralType) {
         self.rawValue = value
     }
 
-    public static let connection = Self("urn:x-cast:com.google.cast.tp.connection")
-    public static let heartbeat = Self("urn:x-cast:com.google.cast.tp.heartbeat")
-    public static let receiver = Self("urn:x-cast:com.google.cast.receiver")
-    public static let media = Self("urn:x-cast:com.google.cast.media")
+    static let connection = Self("urn:x-cast:com.google.cast.tp.connection")
+    static let heartbeat = Self("urn:x-cast:com.google.cast.tp.heartbeat")
+    static let receiver = Self("urn:x-cast:com.google.cast.receiver")
+    static let media = Self("urn:x-cast:com.google.cast.media")
 
-    public init(from decoder: any Decoder) throws {
+    init(from decoder: any Decoder) throws {
         let container = try decoder.singleValueContainer()
         self.rawValue = try container.decode(String.self)
     }
 
-    public func encode(to encoder: any Encoder) throws {
+    func encode(to encoder: any Encoder) throws {
         var container = encoder.singleValueContainer()
         try container.encode(rawValue)
     }
 }
 
 /// Destination for a Cast message relative to the current connection/session.
-public enum CastMessageTarget: Sendable, Hashable, Codable {
+enum CastMessageTarget: Sendable, Hashable, Codable {
     case currentApplication
     case platform
     case transport(id: CastTransportID)
@@ -54,7 +54,7 @@ public enum CastMessageTarget: Sendable, Hashable, Codable {
         case transport
     }
 
-    public init(from decoder: any Decoder) throws {
+    init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         switch try container.decode(Kind.self, forKey: .kind) {
         case .currentApplication:
@@ -66,7 +66,7 @@ public enum CastMessageTarget: Sendable, Hashable, Codable {
         }
     }
 
-    public func encode(to encoder: any Encoder) throws {
+    func encode(to encoder: any Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         switch self {
         case .currentApplication:
@@ -84,23 +84,23 @@ public enum CastMessageTarget: Sendable, Hashable, Codable {
 ///
 /// This type is intentionally a value type. The owner responsible for shared access
 /// (typically a connection/session actor) should serialize mutation.
-public struct CastRequestIDGenerator: Sendable, Hashable, Codable {
-    public private(set) var current: CastRequestID
+struct CastRequestIDGenerator: Sendable, Hashable, Codable {
+    private(set) var current: CastRequestID
 
-    public init(startingAt current: CastRequestID = 0) {
+    init(startingAt current: CastRequestID = 0) {
         self.current = current
     }
 
     /// Returns the next request identifier and advances the generator.
     @discardableResult
-    public mutating func next() -> CastRequestID {
+    mutating func next() -> CastRequestID {
         current = CastRequestID(rawValue: current.rawValue + 1)
         return current
     }
 }
 
 /// Common Cast media protocol message types used by the default media receiver.
-public enum CastMediaMessageType: String, Sendable, Hashable, Codable {
+enum CastMediaMessageType: String, Sendable, Hashable, Codable {
     case mediaStatus = "MEDIA_STATUS"
     case getStatus = "GET_STATUS"
     case load = "LOAD"
@@ -118,7 +118,7 @@ public enum CastMediaMessageType: String, Sendable, Hashable, Codable {
 }
 
 /// Common Cast receiver protocol message types used by the platform receiver namespace.
-public enum CastReceiverMessageType: String, Sendable, Hashable, Codable {
+enum CastReceiverMessageType: String, Sendable, Hashable, Codable {
     case receiverStatus = "RECEIVER_STATUS"
     case getStatus = "GET_STATUS"
     case launch = "LAUNCH"

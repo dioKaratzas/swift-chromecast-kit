@@ -9,9 +9,9 @@ import Foundation
 ///
 /// This codec intentionally operates only on the payload JSON string (`payload_utf8`)
 /// portion of Cast v2 messages. Protobuf framing belongs to the transport layer.
-public enum CastMessageJSONCodec {
+enum CastMessageJSONCodec {
     /// Encodes an outbound message payload into a UTF-8 JSON string.
-    public static func encodePayload<Payload: Encodable & Sendable>(
+    static func encodePayload<Payload: Encodable & Sendable>(
         _ message: CastOutboundMessage<Payload>
     ) throws -> String {
         let encoder = JSONEncoder()
@@ -23,7 +23,7 @@ public enum CastMessageJSONCodec {
     }
 
     /// Decodes a UTF-8 JSON payload from an inbound Cast message.
-    public static func decodePayload<Payload: Decodable & Sendable>(
+    static func decodePayload<Payload: Decodable & Sendable>(
         _ type: Payload.Type,
         from message: CastInboundMessage
     ) throws -> Payload {
@@ -33,7 +33,7 @@ public enum CastMessageJSONCodec {
     }
 
     /// Convenience for decoding a payload directly from a UTF-8 JSON string.
-    public static func decodePayload<Payload: Decodable & Sendable>(
+    static func decodePayload<Payload: Decodable & Sendable>(
         _ type: Payload.Type,
         from payloadUTF8: String
     ) throws -> Payload {

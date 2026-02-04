@@ -5,13 +5,13 @@
 
 import Foundation
 
-public extension CastWire.Media {
+extension CastWire.Media {
     /// Wire response for `MEDIA_STATUS`.
     struct StatusResponse: Sendable, Hashable, Codable {
-        public let type: CastMediaMessageType
-        public let status: [Status]
+        let type: CastMediaMessageType
+        let status: [Status]
 
-        public init(
+        init(
             type: CastMediaMessageType = .mediaStatus,
             status: [Status]
         ) {
@@ -21,23 +21,23 @@ public extension CastWire.Media {
     }
 }
 
-public extension CastWire.Media {
+extension CastWire.Media {
     /// Wire media session status entry from `MEDIA_STATUS`.
     struct Status: Sendable, Hashable, Codable {
-        public let mediaSessionId: CastMediaSessionID?
-        public let playerState: CastPlayerState?
-        public let idleReason: CastIdleReason?
-        public let currentTime: TimeInterval?
-        public let playbackRate: Double?
-        public let supportedMediaCommands: UInt64?
-        public let volume: ReceiverVolume?
-        public let activeTrackIds: [CastMediaTrackID]?
-        public let currentItemId: CastQueueItemID?
-        public let loadingItemId: CastQueueItemID?
-        public let repeatMode: CastQueueRepeatMode?
-        public let media: StatusMedia?
+        let mediaSessionId: CastMediaSessionID?
+        let playerState: CastPlayerState?
+        let idleReason: CastIdleReason?
+        let currentTime: TimeInterval?
+        let playbackRate: Double?
+        let supportedMediaCommands: UInt64?
+        let volume: ReceiverVolume?
+        let activeTrackIds: [CastMediaTrackID]?
+        let currentItemId: CastQueueItemID?
+        let loadingItemId: CastQueueItemID?
+        let repeatMode: CastQueueRepeatMode?
+        let media: StatusMedia?
 
-        public init(
+        init(
             mediaSessionId: CastMediaSessionID? = nil,
             playerState: CastPlayerState? = nil,
             idleReason: CastIdleReason? = nil,
@@ -67,30 +67,30 @@ public extension CastWire.Media {
     }
 }
 
-public extension CastWire.Media {
+extension CastWire.Media {
     /// Receiver-reported volume embedded in media status.
     struct ReceiverVolume: Sendable, Hashable, Codable {
-        public let level: Double?
-        public let muted: Bool?
+        let level: Double?
+        let muted: Bool?
 
-        public init(level: Double? = nil, muted: Bool? = nil) {
+        init(level: Double? = nil, muted: Bool? = nil) {
             self.level = level
             self.muted = muted
         }
     }
 }
 
-public extension CastWire.Media {
+extension CastWire.Media {
     /// Media object embedded in a `MEDIA_STATUS` response.
     struct StatusMedia: Sendable, Hashable, Codable {
-        public let contentId: String?
-        public let contentType: String?
-        public let streamType: CastStreamType?
-        public let metadata: Metadata?
-        public let duration: TimeInterval?
-        public let tracks: [Track]?
+        let contentId: String?
+        let contentType: String?
+        let streamType: CastStreamType?
+        let metadata: Metadata?
+        let duration: TimeInterval?
+        let tracks: [Track]?
 
-        public init(
+        init(
             contentId: String? = nil,
             contentType: String? = nil,
             streamType: CastStreamType? = nil,

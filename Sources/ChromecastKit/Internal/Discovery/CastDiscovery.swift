@@ -15,8 +15,8 @@ protocol CastDiscoveryBrowser: Sendable {
 /// Browser/network implementation details are injected behind an internal protocol.
 /// This keeps the public API stable while enabling independent testing of state and
 /// event semantics before mDNS transport integration is implemented.
-public actor CastDiscovery {
-    public let configuration: CastDiscoveryConfiguration
+actor CastDiscovery {
+    let configuration: CastDiscoveryConfiguration
 
     private let browser: any CastDiscoveryBrowser
     private var stateValue = CastDiscoveryState.stopped
@@ -32,12 +32,12 @@ public actor CastDiscovery {
     }
 
     /// Current discovery runtime state.
-    public func state() -> CastDiscoveryState {
+    func state() -> CastDiscoveryState {
         stateValue
     }
 
     /// Current discovered device snapshot.
-    public func devices() -> [CastDeviceDescriptor] {
+    func devices() -> [CastDeviceDescriptor] {
         devicesByID.values.sorted { lhs, rhs in
             if lhs.friendlyName == rhs.friendlyName {
                 return lhs.id.rawValue < rhs.id.rawValue
@@ -47,7 +47,7 @@ public actor CastDiscovery {
     }
 
     /// Subscribes to discovery lifecycle and device change events.
-    public func events() -> AsyncStream<CastDiscoveryEvent> {
+    func events() -> AsyncStream<CastDiscoveryEvent> {
         let id = UUID()
 
         return AsyncStream { continuation in
@@ -59,7 +59,7 @@ public actor CastDiscovery {
     }
 
     /// Starts discovery browsing.
-    public func start() async throws {
+    func start() async throws {
         switch stateValue {
         case .running, .starting:
             return
@@ -82,14 +82,14 @@ public actor CastDiscovery {
     }
 
     /// Stops discovery browsing.
-    public func stop() async {
+    func stop() async {
         await browser.stop()
         stateValue = .stopped
         emit(.stopped)
     }
 
     /// Clears discovered devices without stopping browsing.
-    public func clearDevices() {
+    func clearDevices() {
         devicesByID.removeAll()
     }
 

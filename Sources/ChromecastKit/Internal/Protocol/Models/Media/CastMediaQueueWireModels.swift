@@ -5,18 +5,18 @@
 
 import Foundation
 
-public extension CastWire.Media {
+extension CastWire.Media {
     /// Wire queue item for `QUEUE_*` requests.
     struct QueueItem: Sendable, Hashable, Codable {
-        public let itemId: CastQueueItemID?
-        public let media: Information
-        public let autoplay: Bool?
-        public let startTime: TimeInterval?
-        public let preloadTime: TimeInterval?
-        public let activeTrackIds: [CastMediaTrackID]?
-        public let customData: JSONValue?
+        let itemId: CastQueueItemID?
+        let media: Information
+        let autoplay: Bool?
+        let startTime: TimeInterval?
+        let preloadTime: TimeInterval?
+        let activeTrackIds: [CastMediaTrackID]?
+        let customData: JSONValue?
 
-        public init(
+        init(
             itemId: CastQueueItemID? = nil,
             media: Information,
             autoplay: Bool? = nil,
@@ -36,17 +36,17 @@ public extension CastWire.Media {
     }
 }
 
-public extension CastWire.Media {
+extension CastWire.Media {
     /// Wire model for `QUEUE_LOAD`.
     struct QueueLoadRequest: Sendable, Hashable, Codable {
-        public let type: CastMediaMessageType
-        public let items: [QueueItem]
-        public let startIndex: Int?
-        public let repeatMode: CastQueueRepeatMode?
-        public let currentTime: TimeInterval?
-        public let customData: JSONValue?
+        let type: CastMediaMessageType
+        let items: [QueueItem]
+        let startIndex: Int?
+        let repeatMode: CastQueueRepeatMode?
+        let currentTime: TimeInterval?
+        let customData: JSONValue?
 
-        public init(
+        init(
             type: CastMediaMessageType = .queueLoad,
             items: [QueueItem],
             startIndex: Int? = nil,
@@ -64,15 +64,15 @@ public extension CastWire.Media {
     }
 }
 
-public extension CastWire.Media {
+extension CastWire.Media {
     /// Shared session-bound queue mutation fields.
     struct QueueMutationContext: Sendable, Hashable, Codable {
-        public let mediaSessionId: CastMediaSessionID
-        public let currentItemId: CastQueueItemID?
-        public let currentItemIndex: Int?
-        public let currentTime: TimeInterval?
+        let mediaSessionId: CastMediaSessionID
+        let currentItemId: CastQueueItemID?
+        let currentItemIndex: Int?
+        let currentTime: TimeInterval?
 
-        public init(
+        init(
             mediaSessionId: CastMediaSessionID,
             currentItemId: CastQueueItemID? = nil,
             currentItemIndex: Int? = nil,
@@ -86,18 +86,18 @@ public extension CastWire.Media {
     }
 }
 
-public extension CastWire.Media {
+extension CastWire.Media {
     /// Wire model for `QUEUE_INSERT`.
     struct QueueInsertRequest: Sendable, Hashable, Codable {
-        public let type: CastMediaMessageType
-        public let mediaSessionId: CastMediaSessionID
-        public let currentItemId: CastQueueItemID?
-        public let currentItemIndex: Int?
-        public let currentTime: TimeInterval?
-        public let insertBefore: CastQueueItemID?
-        public let items: [QueueItem]
+        let type: CastMediaMessageType
+        let mediaSessionId: CastMediaSessionID
+        let currentItemId: CastQueueItemID?
+        let currentItemIndex: Int?
+        let currentTime: TimeInterval?
+        let insertBefore: CastQueueItemID?
+        let items: [QueueItem]
 
-        public init(
+        init(
             type: CastMediaMessageType = .queueInsert,
             mediaSessionId: CastMediaSessionID,
             currentItemId: CastQueueItemID? = nil,
@@ -117,16 +117,16 @@ public extension CastWire.Media {
     }
 }
 
-public extension CastWire.Media {
+extension CastWire.Media {
     /// Wire model for `QUEUE_REMOVE`.
     struct QueueRemoveRequest: Sendable, Hashable, Codable {
-        public let type: CastMediaMessageType
-        public let mediaSessionId: CastMediaSessionID
-        public let currentItemId: CastQueueItemID?
-        public let currentTime: TimeInterval?
-        public let itemIds: [CastQueueItemID]
+        let type: CastMediaMessageType
+        let mediaSessionId: CastMediaSessionID
+        let currentItemId: CastQueueItemID?
+        let currentTime: TimeInterval?
+        let itemIds: [CastQueueItemID]
 
-        public init(
+        init(
             type: CastMediaMessageType = .queueRemove,
             mediaSessionId: CastMediaSessionID,
             currentItemId: CastQueueItemID? = nil,
@@ -142,17 +142,17 @@ public extension CastWire.Media {
     }
 }
 
-public extension CastWire.Media {
+extension CastWire.Media {
     /// Wire model for `QUEUE_REORDER`.
     struct QueueReorderRequest: Sendable, Hashable, Codable {
-        public let type: CastMediaMessageType
-        public let mediaSessionId: CastMediaSessionID
-        public let currentItemId: CastQueueItemID?
-        public let currentTime: TimeInterval?
-        public let insertBefore: CastQueueItemID?
-        public let itemIds: [CastQueueItemID]
+        let type: CastMediaMessageType
+        let mediaSessionId: CastMediaSessionID
+        let currentItemId: CastQueueItemID?
+        let currentTime: TimeInterval?
+        let insertBefore: CastQueueItemID?
+        let itemIds: [CastQueueItemID]
 
-        public init(
+        init(
             type: CastMediaMessageType = .queueReorder,
             mediaSessionId: CastMediaSessionID,
             currentItemId: CastQueueItemID? = nil,
@@ -170,18 +170,18 @@ public extension CastWire.Media {
     }
 }
 
-public extension CastWire.Media {
+extension CastWire.Media {
     /// Wire model for `QUEUE_UPDATE`.
     struct QueueUpdateRequest: Sendable, Hashable, Codable {
-        public let type: CastMediaMessageType
-        public let mediaSessionId: CastMediaSessionID
-        public let currentItemId: CastQueueItemID?
-        public let currentTime: TimeInterval?
-        public let jump: Int?
-        public let repeatMode: CastQueueRepeatMode?
-        public let items: [QueueItem]?
+        let type: CastMediaMessageType
+        let mediaSessionId: CastMediaSessionID
+        let currentItemId: CastQueueItemID?
+        let currentTime: TimeInterval?
+        let jump: Int?
+        let repeatMode: CastQueueRepeatMode?
+        let items: [QueueItem]?
 
-        public init(
+        init(
             type: CastMediaMessageType = .queueUpdate,
             mediaSessionId: CastMediaSessionID,
             currentItemId: CastQueueItemID? = nil,

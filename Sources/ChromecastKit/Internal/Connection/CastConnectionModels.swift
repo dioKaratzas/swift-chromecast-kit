@@ -6,13 +6,13 @@
 import Foundation
 
 /// Connection behavior tuning for Cast sessions.
-public struct CastConnectionConfiguration: Sendable, Hashable {
-    public var connectTimeout: TimeInterval
-    public var commandTimeout: TimeInterval
-    public var heartbeatInterval: TimeInterval
-    public var autoReconnect: Bool
+struct CastConnectionConfiguration: Sendable, Hashable {
+    var connectTimeout: TimeInterval
+    var commandTimeout: TimeInterval
+    var heartbeatInterval: TimeInterval
+    var autoReconnect: Bool
 
-    public init(
+    init(
         connectTimeout: TimeInterval = 10,
         commandTimeout: TimeInterval = 10,
         heartbeatInterval: TimeInterval = 5,
@@ -26,7 +26,7 @@ public struct CastConnectionConfiguration: Sendable, Hashable {
 }
 
 /// Reason a Cast connection was closed.
-public enum CastDisconnectReason: String, Sendable, Hashable, Codable {
+enum CastDisconnectReason: String, Sendable, Hashable, Codable {
     case requested
     case remoteClosed
     case heartbeatTimeout
@@ -34,7 +34,7 @@ public enum CastDisconnectReason: String, Sendable, Hashable, Codable {
 }
 
 /// Runtime connection state for a Cast session transport.
-public enum CastConnectionState: Sendable, Hashable {
+enum CastConnectionState: Sendable, Hashable {
     case disconnected
     case connecting
     case connected
@@ -43,7 +43,7 @@ public enum CastConnectionState: Sendable, Hashable {
 }
 
 /// High-level connection lifecycle events emitted by `CastConnection`.
-public enum CastConnectionEvent: Sendable, Hashable {
+enum CastConnectionEvent: Sendable, Hashable {
     case connected
     case disconnected(reason: CastDisconnectReason?)
     case reconnected

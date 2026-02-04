@@ -6,11 +6,11 @@
 import Foundation
 
 /// Configuration for Cast device discovery behavior.
-public struct CastDiscoveryConfiguration: Sendable, Hashable {
-    public var includeGroups: Bool
-    public var browseTimeout: TimeInterval?
+struct CastDiscoveryConfiguration: Sendable, Hashable {
+    var includeGroups: Bool
+    var browseTimeout: TimeInterval?
 
-    public init(
+    init(
         includeGroups: Bool = true,
         browseTimeout: TimeInterval? = nil
     ) {
@@ -20,7 +20,7 @@ public struct CastDiscoveryConfiguration: Sendable, Hashable {
 }
 
 /// Runtime state of the discovery subsystem.
-public enum CastDiscoveryState: Sendable, Hashable {
+enum CastDiscoveryState: Sendable, Hashable {
     case stopped
     case starting
     case running
@@ -28,7 +28,7 @@ public enum CastDiscoveryState: Sendable, Hashable {
 }
 
 /// Discovery event emitted by `CastDiscovery`.
-public enum CastDiscoveryEvent: Sendable, Hashable {
+enum CastDiscoveryEvent: Sendable, Hashable {
     case started
     case stopped
     case deviceUpserted(device: CastDeviceDescriptor, isNew: Bool)
