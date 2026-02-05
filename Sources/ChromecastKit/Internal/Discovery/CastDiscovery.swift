@@ -5,7 +5,14 @@
 
 import Foundation
 
+enum CastDiscoveryBrowserEvent: Sendable, Hashable {
+    case deviceUpserted(CastDeviceDescriptor)
+    case deviceRemoved(CastDeviceID)
+    case error(CastError)
+}
+
 protocol CastDiscoveryBrowser: Sendable {
+    func events() async -> AsyncStream<CastDiscoveryBrowserEvent>
     func start(configuration: CastDiscoveryConfiguration) async throws
     func stop() async
 }
@@ -22,6 +29,11 @@ actor CastDiscovery {
     private var stateValue = CastDiscoveryState.stopped
     private var devicesByID = [CastDeviceID: CastDeviceDescriptor]()
     private var eventContinuations = [UUID: AsyncStream<CastDiscoveryEvent>.Continuation]()
+    private var browserEventsTask: Task<Void, Never>?
+
+    init(configuration: CastDiscoveryConfiguration = .init()) {
+        self.init(configuration: configuration, browser: NWDNSSDDiscoveryBrowser())
+    }
 
     init(
         configuration: CastDiscoveryConfiguration = .init(),
@@ -68,12 +80,15 @@ actor CastDiscovery {
         }
 
         stateValue = .starting
+        startBrowserEventTaskIfNeeded()
 
         do {
             try await browser.start(configuration: configuration)
             stateValue = .running
             emit(.started)
         } catch {
+            browserEventsTask?.cancel()
+            browserEventsTask = nil
             let castError = mapDiscoveryError(error)
             stateValue = .failed(castError)
             emit(.error(castError))
@@ -84,6 +99,8 @@ actor CastDiscovery {
     /// Stops discovery browsing.
     func stop() async {
         await browser.stop()
+        browserEventsTask?.cancel()
+        browserEventsTask = nil
         stateValue = .stopped
         emit(.stopped)
     }
@@ -114,6 +131,32 @@ actor CastDiscovery {
     private func emit(_ event: CastDiscoveryEvent) {
         for continuation in eventContinuations.values {
             continuation.yield(event)
+        }
+    }
+
+    private func startBrowserEventTaskIfNeeded() {
+        guard browserEventsTask == nil else {
+            return
+        }
+
+        let browser = self.browser
+        browserEventsTask = Task {
+            let stream = await browser.events()
+            for await event in stream {
+                self.handleBrowserEvent(event)
+            }
+        }
+    }
+
+    private func handleBrowserEvent(_ event: CastDiscoveryBrowserEvent) {
+        switch event {
+        case let .deviceUpserted(device):
+            upsertDiscoveredDevice(device)
+        case let .deviceRemoved(id):
+            removeDiscoveredDevice(id: id)
+        case let .error(error):
+            stateValue = .failed(error)
+            emit(.error(error))
         }
     }
 

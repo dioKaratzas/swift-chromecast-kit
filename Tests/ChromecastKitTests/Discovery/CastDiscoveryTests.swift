@@ -109,9 +109,20 @@ private actor RecordingDiscoveryBrowser: CastDiscoveryBrowser {
     private let startError: (any Error)?
     private var startCalls = 0
     private var stopCalls = 0
+    private var continuations = [UUID: AsyncStream<CastDiscoveryBrowserEvent>.Continuation]()
 
     init(startError: (any Error)? = nil) {
         self.startError = startError
+    }
+
+    func events() async -> AsyncStream<CastDiscoveryBrowserEvent> {
+        let id = UUID()
+        return AsyncStream { continuation in
+            continuations[id] = continuation
+            continuation.onTermination = { [id] _ in
+                Task { await self.removeContinuation(id: id) }
+            }
+        }
     }
 
     func start(configuration _: CastDiscoveryConfiguration) async throws {
@@ -131,5 +142,9 @@ private actor RecordingDiscoveryBrowser: CastDiscoveryBrowser {
 
     func stopCount() -> Int {
         stopCalls
+    }
+
+    private func removeContinuation(id: UUID) {
+        continuations[id] = nil
     }
 }
