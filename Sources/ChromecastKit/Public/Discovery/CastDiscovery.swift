@@ -5,25 +5,13 @@
 
 import Foundation
 
-enum CastDiscoveryBrowserEvent: Sendable, Hashable {
-    case deviceUpserted(CastDeviceDescriptor)
-    case deviceRemoved(CastDeviceID)
-    case error(CastError)
-}
-
-protocol CastDiscoveryBrowser: Sendable {
-    func events() async -> AsyncStream<CastDiscoveryBrowserEvent>
-    func start(configuration: CastDiscoveryConfiguration) async throws
-    func stop() async
-}
-
 /// Actor that owns discovered device state and discovery lifecycle coordination.
 ///
 /// Browser/network implementation details are injected behind an internal protocol.
 /// This keeps the public API stable while enabling independent testing of state and
 /// event semantics before mDNS transport integration is implemented.
-actor CastDiscovery {
-    let configuration: CastDiscoveryConfiguration
+public actor CastDiscovery {
+    public let configuration: CastDiscoveryConfiguration
 
     private let browser: any CastDiscoveryBrowser
     private var stateValue = CastDiscoveryState.stopped
@@ -31,7 +19,7 @@ actor CastDiscovery {
     private var eventContinuations = [UUID: AsyncStream<CastDiscoveryEvent>.Continuation]()
     private var browserEventsTask: Task<Void, Never>?
 
-    init(configuration: CastDiscoveryConfiguration = .init()) {
+    public init(configuration: CastDiscoveryConfiguration = .init()) {
         self.init(configuration: configuration, browser: NWDNSSDDiscoveryBrowser())
     }
 
@@ -44,12 +32,12 @@ actor CastDiscovery {
     }
 
     /// Current discovery runtime state.
-    func state() -> CastDiscoveryState {
+    public func state() -> CastDiscoveryState {
         stateValue
     }
 
     /// Current discovered device snapshot.
-    func devices() -> [CastDeviceDescriptor] {
+    public func devices() -> [CastDeviceDescriptor] {
         devicesByID.values.sorted { lhs, rhs in
             if lhs.friendlyName == rhs.friendlyName {
                 return lhs.id.rawValue < rhs.id.rawValue
@@ -59,7 +47,7 @@ actor CastDiscovery {
     }
 
     /// Subscribes to discovery lifecycle and device change events.
-    func events() -> AsyncStream<CastDiscoveryEvent> {
+    public func events() -> AsyncStream<CastDiscoveryEvent> {
         let id = UUID()
 
         return AsyncStream { continuation in
@@ -71,7 +59,7 @@ actor CastDiscovery {
     }
 
     /// Starts discovery browsing.
-    func start() async throws {
+    public func start() async throws {
         switch stateValue {
         case .running, .starting:
             return
@@ -97,7 +85,7 @@ actor CastDiscovery {
     }
 
     /// Stops discovery browsing.
-    func stop() async {
+    public func stop() async {
         await browser.stop()
         browserEventsTask?.cancel()
         browserEventsTask = nil
@@ -106,7 +94,7 @@ actor CastDiscovery {
     }
 
     /// Clears discovered devices without stopping browsing.
-    func clearDevices() {
+    public func clearDevices() {
         devicesByID.removeAll()
     }
 
