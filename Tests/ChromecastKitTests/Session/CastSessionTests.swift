@@ -7,7 +7,7 @@ import Testing
 import Foundation
 @testable import ChromecastKit
 
-@Suite("Cast Session Runtime")
+@Suite("Cast Session Runtime", .serialized)
 struct CastSessionTests {
     @Test("connect and disconnect proxy connection lifecycle and events")
     func lifecycle() async throws {
@@ -66,6 +66,8 @@ struct CastSessionTests {
         #expect(getStatus.route.namespace == .receiver)
         #expect(getStatusJSON["type"] == .string("GET_STATUS"))
         #expect(getStatusJSON["requestId"] == .number(1))
+
+        await session.disconnect(reason: .requested)
     }
 
     @Test("inbound statuses update snapshot and enable media session-bound commands")
@@ -242,6 +244,80 @@ struct CastSessionTests {
         #expect(streamed == inbound)
     }
 
+    @Test("custom binary namespace messages are emitted to namespace event subscribers")
+    func customBinaryNamespaceEventsStream() async throws {
+        let transport = TestSessionTransport()
+        let device = CastDeviceDescriptor(
+            id: "device-1",
+            friendlyName: "Living Room",
+            host: "192.168.1.10",
+            port: 8009
+        )
+        let session = CastSessionRuntime(
+            device: device,
+            transport: transport,
+            configuration: .init(heartbeatInterval: 0)
+        )
+        try await session.connect()
+        var iterator = await session
+            .namespaceEvents(namespace: CastNamespace("urn:x-cast:com.example.binary"))
+            .makeAsyncIterator()
+
+        await transport.emitInboundEvent(
+            .binary(
+                .init(
+                    route: .init(
+                        sourceID: "web-42",
+                        destinationID: "sender-0",
+                        namespace: "urn:x-cast:com.example.binary"
+                    ),
+                    payloadBinary: Data([0x01, 0x02, 0x03])
+                )
+            )
+        )
+
+        let streamed = try #require(await iterator.next())
+        guard case let .binary(message) = streamed else {
+            Issue.record("Expected binary namespace event")
+            return
+        }
+        #expect(message.payloadBinary == Data([0x01, 0x02, 0x03]))
+
+        await session.disconnect(reason: .requested)
+    }
+
+    @Test("transport closed event disconnects and auto reconnects when enabled")
+    func transportClosedAutoReconnects() async throws {
+        let transport = TestSessionTransport()
+        let device = CastDeviceDescriptor(
+            id: "device-1",
+            friendlyName: "Living Room",
+            host: "192.168.1.10",
+            port: 8009
+        )
+        let session = CastSessionRuntime(
+            device: device,
+            transport: transport,
+            configuration: .init(heartbeatInterval: 0, autoReconnect: true)
+        )
+        var events = await session.connectionEvents().makeAsyncIterator()
+
+        try await session.connect()
+        _ = try await nextConnectionEvent(&events) // .connected
+        await transport.emitInboundEvent(.closed)
+
+        let first = try await nextConnectionEvent(&events)
+        let second = try await nextConnectionEvent(&events)
+        #expect(first == .disconnected(reason: .remoteClosed))
+        #expect(second == .connected)
+
+        let lifecycle = await transport.lifecycle()
+        #expect(lifecycle.connects >= 2)
+        #expect(lifecycle.disconnects >= 1)
+
+        await session.disconnect(reason: .requested)
+    }
+
     private func nextConnectionEvent(
         _ iterator: inout AsyncStream<CastConnectionEvent>.AsyncIterator
     ) async throws -> CastConnectionEvent {
@@ -252,10 +328,11 @@ struct CastSessionTests {
     }
 }
 
-private actor TestSessionTransport: CastConnectionTransport, CastCommandTransport {
+private actor TestSessionTransport: CastConnectionTransport, CastCommandTransport, CastInboundEventTransport {
     private(set) var connectCount = 0
     private(set) var disconnectCount = 0
     private var sentCommands = [CastEncodedCommand]()
+    private var inboundEventContinuations = [UUID: AsyncStream<CastInboundTransportEvent>.Continuation]()
 
     func connect(timeout _: TimeInterval) async throws {
         connectCount += 1
@@ -263,10 +340,30 @@ private actor TestSessionTransport: CastConnectionTransport, CastCommandTranspor
 
     func disconnect() async {
         disconnectCount += 1
+        for continuation in inboundEventContinuations.values {
+            continuation.finish()
+        }
+        inboundEventContinuations.removeAll(keepingCapacity: false)
     }
 
     func send(_ command: CastEncodedCommand) async throws {
         sentCommands.append(command)
+    }
+
+    func inboundEvents() async -> AsyncStream<CastInboundTransportEvent> {
+        let id = UUID()
+        return AsyncStream { continuation in
+            inboundEventContinuations[id] = continuation
+            continuation.onTermination = { [id] _ in
+                Task { await self.removeInboundEventContinuation(id: id) }
+            }
+        }
+    }
+
+    func emitInboundEvent(_ event: CastInboundTransportEvent) {
+        for continuation in inboundEventContinuations.values {
+            continuation.yield(event)
+        }
     }
 
     func commands() -> [CastEncodedCommand] {
@@ -275,5 +372,9 @@ private actor TestSessionTransport: CastConnectionTransport, CastCommandTranspor
 
     func lifecycle() -> (connects: Int, disconnects: Int) {
         (connectCount, disconnectCount)
+    }
+
+    private func removeInboundEventContinuation(id: UUID) {
+        inboundEventContinuations[id] = nil
     }
 }

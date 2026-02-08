@@ -127,15 +127,7 @@ struct CastCommandDispatcherTests {
         }
 
         // Ensure the command has been sent and requestId assigned.
-        var command: CastEncodedCommand?
-        for _ in 0 ..< 10 {
-            command = await transport.commands().first
-            if command != nil {
-                break
-            }
-            await Task.yield()
-        }
-        let sent = try #require(command)
+        let sent = try #require(await waitForFirstCommand(on: transport))
         #expect(sent.requestID == 1)
 
         let consumed = try await dispatcher.consumeInboundMessage(
@@ -214,6 +206,72 @@ struct CastCommandDispatcherTests {
         )
 
         #expect(!consumed)
+    }
+
+    @Test("sendAndAwaitReply throws mapped invalid request error replies")
+    func sendAndAwaitReplyMapsErrorReplies() async throws {
+        let transport = RecordingCommandTransport()
+        let dispatcher = CastCommandDispatcher(transport: transport)
+
+        let replyTask = Task {
+            try await dispatcher.sendAndAwaitReply(
+                namespace: .receiver,
+                target: .platform,
+                payload: CastReceiverPayloadBuilder.getStatus()
+            )
+        }
+
+        for _ in 0 ..< 10 {
+            if await transport.commands().isEmpty == false { break }
+            await Task.yield()
+        }
+
+        _ = try await dispatcher.consumeInboundMessage(
+            .init(
+                route: .init(sourceID: "receiver-0", destinationID: "sender-0", namespace: .receiver),
+                payloadUTF8: #"{"type":"INVALID_REQUEST","requestId":1,"reason":"bad"}"#
+            )
+        )
+
+        await #expect(throws: CastError.self) {
+            _ = try await replyTask.value
+        }
+    }
+
+    @Test("binary tracked sends inject requestId into json bytes")
+    func sendBinaryInjectsRequestID() async throws {
+        let transport = RecordingCommandTransport()
+        let dispatcher = CastCommandDispatcher(transport: transport)
+
+        let requestID = try await dispatcher.sendBinary(
+            namespace: .receiver,
+            target: .platform,
+            payload: Data(#"{"type":"PING"}"#.utf8)
+        )
+
+        #expect(requestID == 1)
+        let command = try #require(await transport.commands().first)
+        guard case let .binary(bytes) = command.payload else {
+            Issue.record("Expected binary command payload")
+            return
+        }
+        let json = try JSONDecoder().decode([String: JSONValue].self, from: bytes)
+        #expect(json["type"] == .string("PING"))
+        #expect(json["requestId"] == .number(1))
+    }
+
+    private func waitForFirstCommand(
+        on transport: RecordingCommandTransport,
+        timeout: TimeInterval = 0.5
+    ) async -> CastEncodedCommand? {
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            if let command = await transport.commands().first {
+                return command
+            }
+            try? await Task.sleep(nanoseconds: 1_000_000)
+        }
+        return await transport.commands().first
     }
 }
 

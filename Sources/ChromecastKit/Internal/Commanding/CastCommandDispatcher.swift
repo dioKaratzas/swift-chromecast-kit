@@ -5,10 +5,29 @@
 
 import Foundation
 
+enum CastCommandPayload: Sendable, Hashable {
+    case utf8(String)
+    case binary(Data)
+}
+
 struct CastEncodedCommand: Sendable, Hashable {
     let requestID: CastRequestID
     let route: CastMessageRoute
-    let payloadUTF8: String
+    let payload: CastCommandPayload
+
+    var payloadUTF8: String {
+        guard case let .utf8(value) = payload else {
+            preconditionFailure("Attempted to access UTF-8 payload on binary Cast command")
+        }
+        return value
+    }
+
+    var payloadBinary: Data {
+        guard case let .binary(value) = payload else {
+            preconditionFailure("Attempted to access binary payload on UTF-8 Cast command")
+        }
+        return value
+    }
 }
 
 protocol CastCommandTransport: Sendable {
@@ -66,6 +85,17 @@ actor CastCommandDispatcher {
         return command.requestID
     }
 
+    @discardableResult
+    func sendBinary(
+        namespace: CastNamespace,
+        target: CastMessageTarget,
+        payload: Data
+    ) async throws -> CastRequestID {
+        let command = try makeEncodedBinaryCommand(namespace: namespace, target: target, payload: payload)
+        try await transport.send(command)
+        return command.requestID
+    }
+
     /// Sends a command without injecting `requestId`.
     ///
     /// Used for Cast transport-control namespaces such as connection and heartbeat.
@@ -75,6 +105,20 @@ actor CastCommandDispatcher {
         payload: Payload
     ) async throws {
         let command = try makeEncodedCommand(
+            namespace: namespace,
+            target: target,
+            payload: payload,
+            includeRequestID: false
+        )
+        try await transport.send(command)
+    }
+
+    func sendBinaryUntracked(
+        namespace: CastNamespace,
+        target: CastMessageTarget,
+        payload: Data
+    ) async throws {
+        let command = try makeEncodedBinaryCommand(
             namespace: namespace,
             target: target,
             payload: payload,
@@ -138,7 +182,11 @@ actor CastCommandDispatcher {
         }
 
         pendingReply.timeoutTask?.cancel()
-        pendingReply.continuation.resume(returning: message)
+        if let replyError = try extractReplyError(from: message.payloadUTF8) {
+            pendingReply.continuation.resume(throwing: replyError)
+        } else {
+            pendingReply.continuation.resume(returning: message)
+        }
         return true
     }
 
@@ -199,7 +247,21 @@ actor CastCommandDispatcher {
             route: route,
             includeRequestID: includeRequestID
         )
-        return .init(requestID: requestID, route: route, payloadUTF8: payloadUTF8)
+        return .init(requestID: requestID, route: route, payload: .utf8(payloadUTF8))
+    }
+
+    private func makeEncodedBinaryCommand(
+        namespace: CastNamespace,
+        target: CastMessageTarget,
+        payload: Data,
+        includeRequestID: Bool = true
+    ) throws -> CastEncodedCommand {
+        let route = try resolveRoute(namespace: namespace, target: target)
+        let requestID: CastRequestID = includeRequestID ? requestIDs.next() : 0
+        let payloadData = try includeRequestID
+            ? encodeBinaryPayloadWithInjectedRequestID(payload, requestID: requestID)
+            : payload
+        return .init(requestID: requestID, route: route, payload: .binary(payloadData))
     }
 
     private func resolveRoute(
@@ -269,5 +331,55 @@ actor CastCommandDispatcher {
         default:
             return nil
         }
+    }
+
+    private func extractReplyError(from payloadUTF8: String) throws -> CastError? {
+        let object = try CastMessageJSONCodec.decodePayload([String: JSONValue].self, from: payloadUTF8)
+        guard case let .string(type)? = object["type"] else {
+            return nil
+        }
+
+        let message = extractString(object["reason"]) ?? extractString(object["message"]) ?? type
+        let code = extractInt(object["detailedErrorCode"]) ?? extractInt(object["code"])
+
+        switch type {
+        case "INVALID_REQUEST":
+            return .requestFailed(code: code, message: message)
+        case "LOAD_FAILED":
+            return .loadFailed(code: code, message: message)
+        default:
+            if type.hasSuffix("_FAILED") || type.hasPrefix("INVALID_") {
+                return .requestFailed(code: code, message: message)
+            }
+            return nil
+        }
+    }
+
+    private func extractString(_ value: JSONValue?) -> String? {
+        guard case let .string(string)? = value else {
+            return nil
+        }
+        return string
+    }
+
+    private func extractInt(_ value: JSONValue?) -> Int? {
+        switch value {
+        case let .number(number):
+            return Int(number)
+        case let .string(string):
+            return Int(string)
+        default:
+            return nil
+        }
+    }
+
+    private func encodeBinaryPayloadWithInjectedRequestID(
+        _ payload: Data,
+        requestID: CastRequestID
+    ) throws -> Data {
+        let object = try JSONDecoder().decode([String: JSONValue].self, from: payload)
+        var updated = object
+        updated["requestId"] = .number(Double(requestID.rawValue))
+        return try JSONEncoder().encode(updated)
     }
 }

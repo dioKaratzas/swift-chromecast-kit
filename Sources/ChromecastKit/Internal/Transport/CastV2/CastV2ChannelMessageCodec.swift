@@ -49,7 +49,12 @@ enum CastV2ChannelMessageCodec {
     }
 
     static func encode(command: CastEncodedCommand) throws -> Data {
-        try encode(route: command.route, payloadUTF8: command.payloadUTF8)
+        switch command.payload {
+        case let .utf8(payloadUTF8):
+            return try encode(route: command.route, payloadUTF8: payloadUTF8)
+        case let .binary(payloadBinary):
+            return try encode(route: command.route, payloadBinary: payloadBinary)
+        }
     }
 
     static func encode(route: CastMessageRoute, payloadUTF8: String) throws -> Data {
@@ -60,6 +65,17 @@ enum CastV2ChannelMessageCodec {
         writer.writeStringField(Field.namespace, value: route.namespace.rawValue)
         writer.writeVarintField(Field.payloadType, value: CastPayloadType.string.rawValue)
         writer.writeStringField(Field.payloadUTF8, value: payloadUTF8)
+        return writer.data
+    }
+
+    static func encode(route: CastMessageRoute, payloadBinary: Data) throws -> Data {
+        var writer = ProtobufWriter()
+        writer.writeVarintField(Field.protocolVersion, value: CastProtocolVersion.castV2_1_0.rawValue)
+        writer.writeStringField(Field.sourceID, value: route.sourceID.rawValue)
+        writer.writeStringField(Field.destinationID, value: route.destinationID.rawValue)
+        writer.writeStringField(Field.namespace, value: route.namespace.rawValue)
+        writer.writeVarintField(Field.payloadType, value: CastPayloadType.binary.rawValue)
+        writer.writeBytesField(Field.payloadBinary, value: payloadBinary)
         return writer.data
     }
 
@@ -157,6 +173,12 @@ private struct ProtobufWriter {
         writeVarint(fieldKey(fieldNumber, wireType: .lengthDelimited))
         writeVarint(UInt64(bytes.count))
         data.append(bytes)
+    }
+
+    mutating func writeBytesField(_ fieldNumber: Int, value: Data) {
+        writeVarint(fieldKey(fieldNumber, wireType: .lengthDelimited))
+        writeVarint(UInt64(value.count))
+        data.append(value)
     }
 
     private func fieldKey(_ fieldNumber: Int, wireType: CastV2ProtoWireType) -> UInt64 {

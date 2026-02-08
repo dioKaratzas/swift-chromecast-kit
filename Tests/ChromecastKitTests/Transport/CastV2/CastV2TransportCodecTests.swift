@@ -104,6 +104,25 @@ struct CastV2TransportCodecTests {
         }
     }
 
+    @Test("frame codec encodes binary command payloads")
+    func frameCodecEncodesBinaryCommands() throws {
+        let command = CastEncodedCommand(
+            requestID: 1,
+            route: .init(sourceID: "sender-0", destinationID: "receiver-0", namespace: .receiver),
+            payload: .binary(Data([0xAA, 0xBB]))
+        )
+
+        let frame = try CastV2FrameCodec.encodeFrame(command: command)
+        let body = try CastV2FrameCodec.decodeFrameBody(frame)
+        let decoded = try CastV2ChannelMessageCodec.decodeTransportMessage(body)
+
+        guard case let .binary(payload) = decoded.payload else {
+            Issue.record("Expected binary payload")
+            return
+        }
+        #expect(payload == Data([0xAA, 0xBB]))
+    }
+
     private func makeBinaryPayloadCastMessageBody(binaryPayload: Data) -> Data {
         var writer = TestProtoWriter()
         writer.writeVarint(fieldNumber: 1, value: 0)

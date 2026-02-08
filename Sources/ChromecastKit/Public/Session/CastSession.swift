@@ -118,12 +118,50 @@ public actor CastSession {
         )
     }
 
+    /// Sends a binary payload on a Cast namespace and injects a `requestId` by editing JSON payload bytes.
+    ///
+    /// Use this only for namespaces that define binary payloads. If the payload is not a JSON object
+    /// and you do not want request correlation fields injected, prefer `sendBinaryUntracked`.
+    @discardableResult
+    public func sendBinary(
+        namespace: CastNamespace,
+        target: NamespaceTarget = .currentApplication,
+        payload: Data
+    ) async throws -> CastRequestID {
+        try await runtime.sendBinaryNamespaceMessage(
+            namespace: namespace,
+            target: target.coreValue,
+            payload: payload
+        )
+    }
+
+    /// Sends a binary payload on a Cast namespace without injecting a `requestId`.
+    public func sendBinaryUntracked(
+        namespace: CastNamespace,
+        target: NamespaceTarget = .currentApplication,
+        payload: Data
+    ) async throws {
+        try await runtime.sendBinaryNamespaceMessageUntracked(
+            namespace: namespace,
+            target: target.coreValue,
+            payload: payload
+        )
+    }
+
     /// Emits inbound messages for custom (non-core) Cast namespaces.
     ///
     /// Pass a specific namespace to filter to a single app-defined channel.
     public func namespaceMessages(_ namespace: CastNamespace? = nil) async -> AsyncStream<NamespaceMessage> {
         let coreStream = await runtime.namespaceMessages(namespace: namespace)
         return mapStream(coreStream) { $0.publicNamespaceMessage }
+    }
+
+    /// Emits inbound custom namespace messages (UTF-8 or binary).
+    ///
+    /// This low-level API is useful for advanced integrations and app-specific protocols.
+    public func namespaceEvents(_ namespace: CastNamespace? = nil) async -> AsyncStream<NamespaceEvent> {
+        let coreStream = await runtime.namespaceEvents(namespace: namespace)
+        return mapStream(coreStream) { $0.publicNamespaceEvent }
     }
 }
 

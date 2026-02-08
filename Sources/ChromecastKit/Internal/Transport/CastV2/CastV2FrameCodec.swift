@@ -12,7 +12,8 @@ enum CastV2FrameCodec {
     static let defaultMaxFrameSize = 1024 * 1024
 
     static func encodeFrame(command: CastEncodedCommand) throws -> Data {
-        try encodeFrame(route: command.route, payloadUTF8: command.payloadUTF8)
+        let message = try CastV2ChannelMessageCodec.encode(command: command)
+        return try encodeFrameBody(message)
     }
 
     static func encodeFrame(route: CastMessageRoute, payloadUTF8: String) throws -> Data {

@@ -107,6 +107,53 @@ public extension CastSession {
             try decodePayload([String: JSONValue].self)
         }
     }
+
+    /// Payload for a custom namespace inbound message.
+    enum NamespacePayload: Sendable, Hashable {
+        case utf8(String)
+        case binary(Data)
+    }
+
+    /// Inbound custom namespace message supporting UTF-8 and binary payloads.
+    struct NamespaceEvent: Sendable, Hashable {
+        public let namespace: CastNamespace
+        public let sourceID: String
+        public let destinationID: String
+        public let payload: NamespacePayload
+
+        public init(
+            namespace: CastNamespace,
+            sourceID: String,
+            destinationID: String,
+            payload: NamespacePayload
+        ) {
+            self.namespace = namespace
+            self.sourceID = sourceID
+            self.destinationID = destinationID
+            self.payload = payload
+        }
+
+        public var payloadUTF8: String? {
+            guard case let .utf8(value) = payload else { return nil }
+            return value
+        }
+
+        public var payloadBinary: Data? {
+            guard case let .binary(value) = payload else { return nil }
+            return value
+        }
+
+        public func decodePayload<T: Decodable & Sendable>(_ type: T.Type = T.self) throws -> T {
+            guard let payloadUTF8 else {
+                throw CastError.unsupportedFeature("Cannot decode binary namespace payload as JSON")
+            }
+            return try CastMessageJSONCodec.decodePayload(T.self, from: payloadUTF8)
+        }
+
+        public func jsonObject() throws -> [String: JSONValue] {
+            try decodePayload([String: JSONValue].self)
+        }
+    }
 }
 
 extension CastSession.Configuration {
@@ -198,5 +245,26 @@ extension CastInboundMessage {
             destinationID: route.destinationID.rawValue,
             payloadUTF8: payloadUTF8
         )
+    }
+}
+
+extension CastSessionRuntime.CastNamespaceInboundEvent {
+    var publicNamespaceEvent: CastSession.NamespaceEvent {
+        switch self {
+        case let .utf8(message):
+            return .init(
+                namespace: message.route.namespace,
+                sourceID: message.route.sourceID.rawValue,
+                destinationID: message.route.destinationID.rawValue,
+                payload: .utf8(message.payloadUTF8)
+            )
+        case let .binary(message):
+            return .init(
+                namespace: message.route.namespace,
+                sourceID: message.route.sourceID.rawValue,
+                destinationID: message.route.destinationID.rawValue,
+                payload: .binary(message.payloadBinary)
+            )
+        }
     }
 }

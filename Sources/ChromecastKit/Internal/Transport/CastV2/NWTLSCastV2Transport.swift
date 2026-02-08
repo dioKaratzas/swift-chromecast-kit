@@ -12,13 +12,14 @@ import Foundation
 /// It sends typed Cast commands using the Cast v2 protobuf envelope and emits inbound JSON
 /// messages for the current controller/session pipeline. Binary envelopes are decoded at the
 /// transport layer but ignored by the JSON-only session runtime for now.
-actor NWTLSCastV2Transport: CastConnectionTransport, CastCommandTransport, CastInboundMessageTransport {
+actor NWTLSCastV2Transport: CastConnectionTransport, CastCommandTransport, CastInboundMessageTransport, CastInboundEventTransport {
     private let device: CastDeviceDescriptor
     private let callbackQueue = DispatchQueue(label: "ChromecastKit.Transport.CastV2")
     private let receiveChunkSize: Int
 
     private var connection: NWConnection?
     private var inboundContinuations = [UUID: AsyncStream<CastInboundMessage>.Continuation]()
+    private var inboundEventContinuations = [UUID: AsyncStream<CastInboundTransportEvent>.Continuation]()
     private var readLoopTask: Task<Void, Never>?
 
     init(device: CastDeviceDescriptor, receiveChunkSize: Int = 64 * 1024) {
@@ -32,6 +33,16 @@ actor NWTLSCastV2Transport: CastConnectionTransport, CastCommandTransport, CastI
             inboundContinuations[id] = continuation
             continuation.onTermination = { [id] _ in
                 Task { await self.removeInboundContinuation(id: id) }
+            }
+        }
+    }
+
+    func inboundEvents() async -> AsyncStream<CastInboundTransportEvent> {
+        let id = UUID()
+        return AsyncStream { continuation in
+            inboundEventContinuations[id] = continuation
+            continuation.onTermination = { [id] _ in
+                Task { await self.removeInboundEventContinuation(id: id) }
             }
         }
     }
@@ -66,6 +77,7 @@ actor NWTLSCastV2Transport: CastConnectionTransport, CastCommandTransport, CastI
 
         connection?.cancel()
         connection = nil
+        finishInboundStreams()
     }
 
     func send(_ command: CastEncodedCommand) async throws {
@@ -99,10 +111,11 @@ actor NWTLSCastV2Transport: CastConnectionTransport, CastCommandTransport, CastI
                             let message = try CastV2ChannelMessageCodec.decodeTransportMessage(body)
                             switch message.payload {
                             case let .utf8(payloadUTF8):
-                                emitInbound(.init(route: message.route, payloadUTF8: payloadUTF8))
-                            case .binary:
-                                // Future: expose binary namespace payloads to a separate low-level stream.
-                                continue
+                                let inbound = CastInboundMessage(route: message.route, payloadUTF8: payloadUTF8)
+                                emitInbound(inbound)
+                                emitInboundEvent(.utf8(inbound))
+                            case let .binary(payloadBinary):
+                                emitInboundEvent(.binary(.init(route: message.route, payloadBinary: payloadBinary)))
                             }
                         } catch {
                             // Ignore malformed inbound messages for now; connection remains alive.
@@ -112,13 +125,17 @@ actor NWTLSCastV2Transport: CastConnectionTransport, CastCommandTransport, CastI
                 }
 
                 if chunk.isComplete {
+                    emitInboundEvent(.closed)
+                    finishInboundStreams()
                     break
                 }
             }
         } catch is CancellationError {
             // Expected during explicit disconnect or reconnect.
         } catch {
-            // Future: plumb transport read errors into connection/session runtime events.
+            let castError = (error as? CastError) ?? .connectionFailed(String(describing: error))
+            emitInboundEvent(.failure(castError))
+            finishInboundStreams()
         }
     }
 
@@ -130,6 +147,28 @@ actor NWTLSCastV2Transport: CastConnectionTransport, CastCommandTransport, CastI
 
     private func removeInboundContinuation(id: UUID) {
         inboundContinuations[id] = nil
+    }
+
+    private func emitInboundEvent(_ event: CastInboundTransportEvent) {
+        for continuation in inboundEventContinuations.values {
+            continuation.yield(event)
+        }
+    }
+
+    private func finishInboundStreams() {
+        for continuation in inboundContinuations.values {
+            continuation.finish()
+        }
+        inboundContinuations.removeAll(keepingCapacity: false)
+
+        for continuation in inboundEventContinuations.values {
+            continuation.finish()
+        }
+        inboundEventContinuations.removeAll(keepingCapacity: false)
+    }
+
+    private func removeInboundEventContinuation(id: UUID) {
+        inboundEventContinuations[id] = nil
     }
 
     private static func startAndWaitUntilReady(
