@@ -9,15 +9,15 @@ import Foundation
 ///
 /// This actor emits typed media commands to the currently active application transport.
 /// Response parsing and session/media status handling will be layered on top later.
-actor CastMediaController {
+public actor CastMediaController {
     /// Options for `load(_:options:)`.
-    struct LoadOptions: Sendable, Hashable, Codable {
-        var autoplay: Bool
-        var startTime: TimeInterval?
-        var activeTextTrackIDs: [CastMediaTrackID]
-        var customData: JSONValue?
+    public struct LoadOptions: Sendable, Hashable, Codable {
+        public var autoplay: Bool
+        public var startTime: TimeInterval?
+        public var activeTextTrackIDs: [CastMediaTrackID]
+        public var customData: JSONValue?
 
-        init(
+        public init(
             autoplay: Bool = true,
             startTime: TimeInterval? = nil,
             activeTextTrackIDs: [CastMediaTrackID] = [],
@@ -31,13 +31,13 @@ actor CastMediaController {
     }
 
     /// Options for `queueLoad(items:options:)`.
-    struct QueueLoadOptions: Sendable, Hashable, Codable {
-        var startIndex: Int?
-        var repeatMode: CastQueueRepeatMode?
-        var currentTime: TimeInterval?
-        var customData: JSONValue?
+    public struct QueueLoadOptions: Sendable, Hashable, Codable {
+        public var startIndex: Int?
+        public var repeatMode: CastQueueRepeatMode?
+        public var currentTime: TimeInterval?
+        public var customData: JSONValue?
 
-        init(
+        public init(
             startIndex: Int? = nil,
             repeatMode: CastQueueRepeatMode? = nil,
             currentTime: TimeInterval? = nil,
@@ -51,13 +51,13 @@ actor CastMediaController {
     }
 
     /// Options for `queueInsert(items:options:)`.
-    struct QueueInsertOptions: Sendable, Hashable, Codable {
-        var currentItemID: CastQueueItemID?
-        var currentItemIndex: Int?
-        var currentTime: TimeInterval?
-        var insertBeforeItemID: CastQueueItemID?
+    public struct QueueInsertOptions: Sendable, Hashable, Codable {
+        public var currentItemID: CastQueueItemID?
+        public var currentItemIndex: Int?
+        public var currentTime: TimeInterval?
+        public var insertBeforeItemID: CastQueueItemID?
 
-        init(
+        public init(
             currentItemID: CastQueueItemID? = nil,
             currentItemIndex: Int? = nil,
             currentTime: TimeInterval? = nil,
@@ -71,11 +71,11 @@ actor CastMediaController {
     }
 
     /// Options for `queueRemove(itemIDs:options:)`.
-    struct QueueRemoveOptions: Sendable, Hashable, Codable {
-        var currentItemID: CastQueueItemID?
-        var currentTime: TimeInterval?
+    public struct QueueRemoveOptions: Sendable, Hashable, Codable {
+        public var currentItemID: CastQueueItemID?
+        public var currentTime: TimeInterval?
 
-        init(
+        public init(
             currentItemID: CastQueueItemID? = nil,
             currentTime: TimeInterval? = nil
         ) {
@@ -85,12 +85,12 @@ actor CastMediaController {
     }
 
     /// Options for `queueReorder(itemIDs:options:)`.
-    struct QueueReorderOptions: Sendable, Hashable, Codable {
-        var currentItemID: CastQueueItemID?
-        var currentTime: TimeInterval?
-        var insertBeforeItemID: CastQueueItemID?
+    public struct QueueReorderOptions: Sendable, Hashable, Codable {
+        public var currentItemID: CastQueueItemID?
+        public var currentTime: TimeInterval?
+        public var insertBeforeItemID: CastQueueItemID?
 
-        init(
+        public init(
             currentItemID: CastQueueItemID? = nil,
             currentTime: TimeInterval? = nil,
             insertBeforeItemID: CastQueueItemID? = nil
@@ -102,13 +102,13 @@ actor CastMediaController {
     }
 
     /// Options for `queueUpdate(items:options:)`.
-    struct QueueUpdateOptions: Sendable, Hashable, Codable {
-        var currentItemID: CastQueueItemID?
-        var currentTime: TimeInterval?
-        var jump: Int?
-        var repeatMode: CastQueueRepeatMode?
+    public struct QueueUpdateOptions: Sendable, Hashable, Codable {
+        public var currentItemID: CastQueueItemID?
+        public var currentTime: TimeInterval?
+        public var jump: Int?
+        public var repeatMode: CastQueueRepeatMode?
 
-        init(
+        public init(
             currentItemID: CastQueueItemID? = nil,
             currentTime: TimeInterval? = nil,
             jump: Int? = nil,
@@ -137,7 +137,7 @@ actor CastMediaController {
 
     /// Requests media status from the active media transport.
     @discardableResult
-    func getStatus() async throws -> CastRequestID {
+    public func getStatus() async throws -> CastRequestID {
         try await dispatcher.send(
             namespace: .media,
             target: .currentApplication,
@@ -147,7 +147,7 @@ actor CastMediaController {
 
     /// Loads media into the active media receiver/app transport.
     @discardableResult
-    func load(
+    public func load(
         _ item: CastMediaItem,
         options: LoadOptions = .init()
     ) async throws -> CastRequestID {
@@ -168,7 +168,7 @@ actor CastMediaController {
 
     /// Loads a media queue into the active media receiver/app transport.
     @discardableResult
-    func queueLoad(
+    public func queueLoad(
         items: [CastQueueItem],
         options: QueueLoadOptions = .init()
     ) async throws -> CastRequestID {
@@ -189,7 +189,7 @@ actor CastMediaController {
 
     /// Enables a text track by Cast track ID.
     @discardableResult
-    func enableTextTrack(id: CastMediaTrackID) async throws -> CastRequestID {
+    public func enableTextTrack(id: CastMediaTrackID) async throws -> CastRequestID {
         let mediaSessionID = try requireMediaSessionID()
         return try await dispatcher.send(
             namespace: .media,
@@ -200,7 +200,7 @@ actor CastMediaController {
 
     /// Disables all active text tracks.
     @discardableResult
-    func disableTextTracks() async throws -> CastRequestID {
+    public func disableTextTracks() async throws -> CastRequestID {
         let mediaSessionID = try requireMediaSessionID()
         return try await dispatcher.send(
             namespace: .media,
@@ -211,7 +211,7 @@ actor CastMediaController {
 
     /// Updates text track styling for the current media session.
     @discardableResult
-    func setTextTrackStyle(_ style: CastTextTrackStyle) async throws -> CastRequestID {
+    public func setTextTrackStyle(_ style: CastTextTrackStyle) async throws -> CastRequestID {
         let mediaSessionID = try requireMediaSessionID()
         return try await dispatcher.send(
             namespace: .media,
@@ -222,7 +222,7 @@ actor CastMediaController {
 
     /// Sends a `PLAY` command for the current media session.
     @discardableResult
-    func play() async throws -> CastRequestID {
+    public func play() async throws -> CastRequestID {
         let mediaSessionID = try requireMediaSessionID()
         return try await dispatcher.send(
             namespace: .media,
@@ -233,7 +233,7 @@ actor CastMediaController {
 
     /// Sends a `PAUSE` command for the current media session.
     @discardableResult
-    func pause() async throws -> CastRequestID {
+    public func pause() async throws -> CastRequestID {
         let mediaSessionID = try requireMediaSessionID()
         return try await dispatcher.send(
             namespace: .media,
@@ -244,7 +244,7 @@ actor CastMediaController {
 
     /// Sends a `STOP` command for the current media session.
     @discardableResult
-    func stop() async throws -> CastRequestID {
+    public func stop() async throws -> CastRequestID {
         let mediaSessionID = try requireMediaSessionID()
         return try await dispatcher.send(
             namespace: .media,
@@ -255,7 +255,7 @@ actor CastMediaController {
 
     /// Sends a `SEEK` command for the current media session.
     @discardableResult
-    func seek(
+    public func seek(
         to time: TimeInterval,
         resume: Bool? = nil
     ) async throws -> CastRequestID {
@@ -269,7 +269,7 @@ actor CastMediaController {
 
     /// Sends a `SET_PLAYBACK_RATE` command for the current media session.
     @discardableResult
-    func setPlaybackRate(_ rate: Double) async throws -> CastRequestID {
+    public func setPlaybackRate(_ rate: Double) async throws -> CastRequestID {
         let mediaSessionID = try requireMediaSessionID()
         return try await dispatcher.send(
             namespace: .media,
@@ -280,7 +280,7 @@ actor CastMediaController {
 
     /// Inserts queue items into the current media session queue.
     @discardableResult
-    func queueInsert(
+    public func queueInsert(
         items: [CastQueueItem],
         options: QueueInsertOptions = .init()
     ) async throws -> CastRequestID {
@@ -303,7 +303,7 @@ actor CastMediaController {
 
     /// Removes queue items from the current media session queue.
     @discardableResult
-    func queueRemove(
+    public func queueRemove(
         itemIDs: [CastQueueItemID],
         options: QueueRemoveOptions = .init()
     ) async throws -> CastRequestID {
@@ -324,7 +324,7 @@ actor CastMediaController {
 
     /// Reorders queue items in the current media session queue.
     @discardableResult
-    func queueReorder(
+    public func queueReorder(
         itemIDs: [CastQueueItemID],
         options: QueueReorderOptions = .init()
     ) async throws -> CastRequestID {
@@ -346,7 +346,7 @@ actor CastMediaController {
 
     /// Updates queue state or items in the current media session queue.
     @discardableResult
-    func queueUpdate(
+    public func queueUpdate(
         items: [CastQueueItem]? = nil,
         options: QueueUpdateOptions = .init()
     ) async throws -> CastRequestID {

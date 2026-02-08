@@ -66,6 +66,23 @@ actor CastCommandDispatcher {
         return command.requestID
     }
 
+    /// Sends a command without injecting `requestId`.
+    ///
+    /// Used for Cast transport-control namespaces such as connection and heartbeat.
+    func sendUntracked<Payload: Encodable & Sendable>(
+        namespace: CastNamespace,
+        target: CastMessageTarget,
+        payload: Payload
+    ) async throws {
+        let command = try makeEncodedCommand(
+            namespace: namespace,
+            target: target,
+            payload: payload,
+            includeRequestID: false
+        )
+        try await transport.send(command)
+    }
+
     /// Sends a command and suspends until an inbound message with the same `requestId` arrives.
     ///
     /// This powers request/response correlation independently from message-type-specific parsing.
@@ -171,11 +188,17 @@ actor CastCommandDispatcher {
     private func makeEncodedCommand<Payload: Encodable & Sendable>(
         namespace: CastNamespace,
         target: CastMessageTarget,
-        payload: Payload
+        payload: Payload,
+        includeRequestID: Bool = true
     ) throws -> CastEncodedCommand {
         let route = try resolveRoute(namespace: namespace, target: target)
-        let requestID = requestIDs.next()
-        let payloadUTF8 = try encodePayloadUTF8(payload, requestID: requestID, route: route)
+        let requestID: CastRequestID = includeRequestID ? requestIDs.next() : 0
+        let payloadUTF8 = try encodePayloadUTF8(
+            payload,
+            requestID: requestID,
+            route: route,
+            includeRequestID: includeRequestID
+        )
         return .init(requestID: requestID, route: route, payloadUTF8: payloadUTF8)
     }
 
@@ -207,10 +230,15 @@ actor CastCommandDispatcher {
     private func encodePayloadUTF8<Payload: Encodable & Sendable>(
         _ payload: Payload,
         requestID: CastRequestID,
-        route: CastMessageRoute
+        route: CastMessageRoute,
+        includeRequestID: Bool
     ) throws -> String {
         let outbound = CastOutboundMessage(route: route, payload: payload)
         let encoded = try CastMessageJSONCodec.encodePayload(outbound)
+        guard includeRequestID else {
+            return encoded
+        }
+
         var object = try CastMessageJSONCodec.decodePayload([String: JSONValue].self, from: encoded)
         object["requestId"] = .number(Double(requestID.rawValue))
         return try encodeJSONObject(object)

@@ -94,6 +94,25 @@ struct CastCommandDispatcherTests {
         #expect(commands.map(\.requestID) == [1, 2])
     }
 
+    @Test("untracked control messages do not inject requestId")
+    func untrackedControlMessageOmitsRequestID() async throws {
+        let transport = RecordingCommandTransport()
+        let dispatcher = CastCommandDispatcher(transport: transport)
+
+        try await dispatcher.sendUntracked(
+            namespace: .heartbeat,
+            target: .platform,
+            payload: CastWire.Heartbeat.Message(type: .ping)
+        )
+
+        let command = try #require(await transport.commands().first)
+        let json = try JSONDecoder().decode([String: JSONValue].self, from: Data(command.payloadUTF8.utf8))
+
+        #expect(command.route.namespace == .heartbeat)
+        #expect(json["type"] == .string("PING"))
+        #expect(json["requestId"] == nil)
+    }
+
     @Test("sendAndAwaitReply resumes when matching requestId inbound message is consumed")
     func sendAndAwaitReplyCorrelation() async throws {
         let transport = RecordingCommandTransport()

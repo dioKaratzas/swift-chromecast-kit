@@ -18,7 +18,7 @@ struct CastSessionTests {
             host: "192.168.1.10",
             port: 8009
         )
-        let session = CastSession(device: device, transport: transport)
+        let session = CastSessionRuntime(device: device, transport: transport)
         var events = await session.connectionEvents().makeAsyncIterator()
 
         try await session.connect()
@@ -34,6 +34,40 @@ struct CastSessionTests {
         #expect(lifecycle.disconnects == 1)
     }
 
+    @Test("connect bootstraps platform connection and receiver status")
+    func connectBootstrapsPlatformNamespaces() async throws {
+        let transport = TestSessionTransport()
+        let device = CastDeviceDescriptor(
+            id: "device-1",
+            friendlyName: "Living Room",
+            host: "192.168.1.10",
+            port: 8009
+        )
+        let session = CastSessionRuntime(
+            device: device,
+            transport: transport,
+            configuration: .init(heartbeatInterval: 0)
+        )
+
+        try await session.connect()
+
+        let commands = await transport.commands()
+        #expect(commands.count == 2)
+
+        let connect = try #require(commands.first)
+        let connectJSON = try JSONDecoder().decode([String: JSONValue].self, from: Data(connect.payloadUTF8.utf8))
+        #expect(connect.route.namespace == .connection)
+        #expect(connect.route.destinationID == "receiver-0")
+        #expect(connectJSON["type"] == .string("CONNECT"))
+        #expect(connectJSON["requestId"] == nil)
+
+        let getStatus = try #require(commands.last)
+        let getStatusJSON = try JSONDecoder().decode([String: JSONValue].self, from: Data(getStatus.payloadUTF8.utf8))
+        #expect(getStatus.route.namespace == .receiver)
+        #expect(getStatusJSON["type"] == .string("GET_STATUS"))
+        #expect(getStatusJSON["requestId"] == .number(1))
+    }
+
     @Test("inbound statuses update snapshot and enable media session-bound commands")
     func statusProcessingAndCommands() async throws {
         let transport = TestSessionTransport()
@@ -43,7 +77,7 @@ struct CastSessionTests {
             host: "192.168.1.10",
             port: 8009
         )
-        let session = CastSession(device: device, transport: transport)
+        let session = CastSessionRuntime(device: device, transport: transport)
 
         let receiverMessage = CastInboundMessage(
             route: .init(sourceID: "receiver-0", destinationID: "sender-0", namespace: .receiver),
@@ -74,6 +108,138 @@ struct CastSessionTests {
         #expect(command.route.destinationID == "web-42")
         #expect(json["type"] == .string("PLAY"))
         #expect(json["mediaSessionId"] == .number(55))
+    }
+
+    @Test("receiver status bootstraps active app transport connection and media status request")
+    func receiverStatusBootstrapsAppTransport() async throws {
+        let transport = TestSessionTransport()
+        let device = CastDeviceDescriptor(
+            id: "device-1",
+            friendlyName: "Living Room",
+            host: "192.168.1.10",
+            port: 8009
+        )
+        let session = CastSessionRuntime(
+            device: device,
+            transport: transport,
+            configuration: .init(heartbeatInterval: 0)
+        )
+
+        let receiverMessage = CastInboundMessage(
+            route: .init(sourceID: "receiver-0", destinationID: "sender-0", namespace: .receiver),
+            payloadUTF8: #"""
+            {"type":"RECEIVER_STATUS","status":{"volume":{"level":0.5,"muted":false},"applications":[{"appId":"CC1AD845","displayName":"Default Media Receiver","sessionId":"SESSION-1","transportId":"web-42","statusText":"Ready","namespaces":[{"name":"urn:x-cast:com.google.cast.media"}]}]}}
+            """#
+        )
+
+        #expect(try await session.applyInboundMessage(receiverMessage))
+
+        let commands = await transport.commands()
+        #expect(commands.count == 2)
+
+        let appConnect = try #require(commands.first)
+        let appConnectJSON = try JSONDecoder().decode([String: JSONValue].self, from: Data(appConnect.payloadUTF8.utf8))
+        #expect(appConnect.route.namespace == .connection)
+        #expect(appConnect.route.destinationID == "web-42")
+        #expect(appConnectJSON["type"] == .string("CONNECT"))
+        #expect(appConnectJSON["requestId"] == nil)
+
+        let mediaGetStatus = try #require(commands.last)
+        let mediaGetStatusJSON = try JSONDecoder().decode(
+            [String: JSONValue].self,
+            from: Data(mediaGetStatus.payloadUTF8.utf8)
+        )
+        #expect(mediaGetStatus.route.namespace == .media)
+        #expect(mediaGetStatus.route.destinationID == "web-42")
+        #expect(mediaGetStatusJSON["type"] == .string("GET_STATUS"))
+        #expect(mediaGetStatusJSON["requestId"] == .number(1))
+    }
+
+    @Test("heartbeat ping messages are answered with pong")
+    func heartbeatPingRespondsWithPong() async throws {
+        let transport = TestSessionTransport()
+        let device = CastDeviceDescriptor(
+            id: "device-1",
+            friendlyName: "Living Room",
+            host: "192.168.1.10",
+            port: 8009
+        )
+        let session = CastSessionRuntime(
+            device: device,
+            transport: transport,
+            configuration: .init(heartbeatInterval: 0)
+        )
+
+        let handled = try await session.applyInboundMessage(
+            .init(
+                route: .init(sourceID: "receiver-0", destinationID: "sender-0", namespace: .heartbeat),
+                payloadUTF8: #"{"type":"PING"}"#
+            )
+        )
+
+        #expect(handled)
+        let command = try #require(await transport.commands().first)
+        let json = try JSONDecoder().decode([String: JSONValue].self, from: Data(command.payloadUTF8.utf8))
+        #expect(command.route.namespace == .heartbeat)
+        #expect(command.route.destinationID == "receiver-0")
+        #expect(json["type"] == .string("PONG"))
+        #expect(json["requestId"] == nil)
+    }
+
+    @Test("heartbeat timeout disconnects when auto reconnect is disabled")
+    func heartbeatTimeoutDisconnectsWithoutReconnect() async throws {
+        let transport = TestSessionTransport()
+        let device = CastDeviceDescriptor(
+            id: "device-1",
+            friendlyName: "Living Room",
+            host: "192.168.1.10",
+            port: 8009
+        )
+        let session = CastSessionRuntime(
+            device: device,
+            transport: transport,
+            configuration: .init(heartbeatInterval: 0.01, autoReconnect: false)
+        )
+
+        try await session.connect()
+        try await Task.sleep(nanoseconds: 450_000_000)
+
+        #expect(await session.connectionState() == .disconnected)
+        let lifecycle = await transport.lifecycle()
+        #expect(lifecycle.connects == 1)
+        #expect(lifecycle.disconnects >= 1)
+    }
+
+    @Test("custom namespace messages are emitted to namespace subscribers")
+    func customNamespaceMessagesStream() async throws {
+        let transport = TestSessionTransport()
+        let device = CastDeviceDescriptor(
+            id: "device-1",
+            friendlyName: "Living Room",
+            host: "192.168.1.10",
+            port: 8009
+        )
+        let session = CastSessionRuntime(
+            device: device,
+            transport: transport,
+            configuration: .init(heartbeatInterval: 0)
+        )
+        var iterator = await session
+            .namespaceMessages(namespace: CastNamespace("urn:x-cast:com.example.custom"))
+            .makeAsyncIterator()
+
+        let inbound = CastInboundMessage(
+            route: .init(
+                sourceID: "web-42",
+                destinationID: "sender-0",
+                namespace: "urn:x-cast:com.example.custom"
+            ),
+            payloadUTF8: #"{"type":"CUSTOM","value":1}"#
+        )
+
+        #expect(try await !(session.applyInboundMessage(inbound)))
+        let streamed = try #require(await iterator.next())
+        #expect(streamed == inbound)
     }
 
     private func nextConnectionEvent(

@@ -5,38 +5,6 @@
 
 import Foundation
 
-/// Cast protocol namespaces used by platform and media communication.
-struct CastNamespace: RawRepresentable, ExpressibleByStringLiteral, Sendable, Hashable, Codable {
-    let rawValue: String
-
-    init(rawValue: String) {
-        self.rawValue = rawValue
-    }
-
-    init(_ rawValue: String) {
-        self.rawValue = rawValue
-    }
-
-    init(stringLiteral value: StringLiteralType) {
-        self.rawValue = value
-    }
-
-    static let connection = Self("urn:x-cast:com.google.cast.tp.connection")
-    static let heartbeat = Self("urn:x-cast:com.google.cast.tp.heartbeat")
-    static let receiver = Self("urn:x-cast:com.google.cast.receiver")
-    static let media = Self("urn:x-cast:com.google.cast.media")
-
-    init(from decoder: any Decoder) throws {
-        let container = try decoder.singleValueContainer()
-        self.rawValue = try container.decode(String.self)
-    }
-
-    func encode(to encoder: any Encoder) throws {
-        var container = encoder.singleValueContainer()
-        try container.encode(rawValue)
-    }
-}
-
 /// Destination for a Cast message relative to the current connection/session.
 enum CastMessageTarget: Sendable, Hashable, Codable {
     case currentApplication
