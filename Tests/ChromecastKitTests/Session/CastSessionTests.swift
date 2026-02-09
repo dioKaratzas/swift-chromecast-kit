@@ -318,6 +318,39 @@ struct CastSessionTests {
         await session.disconnect(reason: .requested)
     }
 
+    @Test("transport failure emits connection error and disconnect when auto reconnect is disabled")
+    func transportFailureEmitsErrorAndDisconnects() async throws {
+        let transport = TestSessionTransport()
+        let device = CastDeviceDescriptor(
+            id: "device-1",
+            friendlyName: "Living Room",
+            host: "192.168.1.10",
+            port: 8009
+        )
+        let session = CastSessionRuntime(
+            device: device,
+            transport: transport,
+            configuration: .init(heartbeatInterval: 0, autoReconnect: false)
+        )
+        var events = await session.connectionEvents().makeAsyncIterator()
+
+        try await session.connect()
+        _ = try await nextConnectionEvent(&events) // connected
+
+        await transport.emitInboundEvent(.failure(.connectionFailed("socket error")))
+
+        let errorEvent = try await nextConnectionEvent(&events)
+        let disconnectedEvent = try await nextConnectionEvent(&events)
+
+        guard case let .error(error) = errorEvent else {
+            Issue.record("Expected error event")
+            return
+        }
+        #expect(error == .connectionFailed("socket error"))
+        #expect(disconnectedEvent == .disconnected(reason: .networkError))
+        #expect(await session.connectionState() == .disconnected)
+    }
+
     private func nextConnectionEvent(
         _ iterator: inout AsyncStream<CastConnectionEvent>.AsyncIterator
     ) async throws -> CastConnectionEvent {

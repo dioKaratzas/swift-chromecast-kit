@@ -96,6 +96,15 @@ actor CastConnection {
         }
     }
 
+    /// Records a runtime transport failure detected outside the connect/reconnect call path.
+    ///
+    /// This is used by session runtime ingress (read loop, heartbeat, etc.) to surface
+    /// errors through the same connection event stream.
+    func reportRuntimeError(_ error: CastError) {
+        stateValue = .failed(error)
+        emit(.error(error))
+    }
+
     private func emit(_ event: CastConnectionEvent) {
         for continuation in eventContinuations.values {
             continuation.yield(event)

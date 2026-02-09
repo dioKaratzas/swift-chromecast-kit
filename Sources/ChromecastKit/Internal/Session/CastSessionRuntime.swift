@@ -423,6 +423,7 @@ actor CastSessionRuntime {
         case .closed:
             scheduleRecoveryIfNeeded(reason: .remoteClosed)
         case let .failure(error):
+            await connection.reportRuntimeError(error)
             if case .disconnected = error {
                 scheduleRecoveryIfNeeded(reason: .remoteClosed)
             } else {
