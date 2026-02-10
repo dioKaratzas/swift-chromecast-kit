@@ -189,6 +189,20 @@ actor CastSessionRuntime {
         try await dispatcher.send(namespace: namespace, target: target, payload: payload)
     }
 
+    func sendNamespaceMessageAndAwaitReply(
+        namespace: CastNamespace,
+        target: CastMessageTarget,
+        payload: [String: JSONValue],
+        timeout: TimeInterval? = nil
+    ) async throws -> CastInboundMessage {
+        try await dispatcher.sendAndAwaitReply(
+            namespace: namespace,
+            target: target,
+            payload: payload,
+            timeout: timeout
+        )
+    }
+
     func sendNamespaceMessageUntracked(
         namespace: CastNamespace,
         target: CastMessageTarget,

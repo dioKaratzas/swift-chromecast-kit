@@ -103,6 +103,24 @@ public actor CastSession {
         )
     }
 
+    /// Sends a JSON object on a Cast namespace and waits for a correlated reply (`requestId`).
+    ///
+    /// Cast protocol error replies are mapped to `CastError` and thrown.
+    public func sendAndAwaitReply(
+        namespace: CastNamespace,
+        target: NamespaceTarget = .currentApplication,
+        payload: [String: JSONValue],
+        timeout: TimeInterval? = nil
+    ) async throws -> NamespaceMessage {
+        let reply = try await runtime.sendNamespaceMessageAndAwaitReply(
+            namespace: namespace,
+            target: target.coreValue,
+            payload: payload,
+            timeout: timeout
+        )
+        return reply.publicNamespaceMessage
+    }
+
     /// Sends a typed JSON object on a Cast namespace without injecting a `requestId`.
     ///
     /// This is primarily useful for transport-control or app-defined fire-and-forget messages.
