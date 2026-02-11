@@ -321,7 +321,11 @@ actor CastSessionRuntime {
             target: .platform,
             payload: CastWire.Connection.ConnectRequest()
         )
-        _ = try await receiver.getStatus()
+        _ = try await dispatcher.sendAndAwaitReply(
+            namespace: .receiver,
+            target: .platform,
+            payload: CastReceiverPayloadBuilder.getStatus()
+        )
     }
 
     private func startHeartbeatLoopIfNeeded() {

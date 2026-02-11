@@ -183,20 +183,27 @@ public actor CastSession {
     }
 }
 
+private final class StreamMapTaskBox: @unchecked Sendable {
+    var task: Task<Void, Never>?
+}
+
 private func mapStream<Input: Sendable, Output: Sendable>(
     _ input: AsyncStream<Input>,
     transform: @escaping @Sendable (Input) -> Output
 ) -> AsyncStream<Output> {
-    AsyncStream { continuation in
-        let task = Task {
+    AsyncStream<Output> { continuation in
+        let box = StreamMapTaskBox()
+        box.task = Task { [box] in
             for await value in input {
                 continuation.yield(transform(value))
             }
             continuation.finish()
+            box.task = nil
         }
 
-        continuation.onTermination = { _ in
-            task.cancel()
+        continuation.onTermination = { [weak box] _ in
+            box?.task?.cancel()
+            box?.task = nil
         }
     }
 }

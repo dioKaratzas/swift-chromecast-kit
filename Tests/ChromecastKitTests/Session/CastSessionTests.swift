@@ -381,6 +381,7 @@ private actor TestSessionTransport: CastConnectionTransport, CastCommandTranspor
 
     func send(_ command: CastEncodedCommand) async throws {
         sentCommands.append(command)
+        try autoReplyBootstrapReceiverStatusIfNeeded(for: command)
     }
 
     func inboundEvents() async -> AsyncStream<CastInboundTransportEvent> {
@@ -409,5 +410,23 @@ private actor TestSessionTransport: CastConnectionTransport, CastCommandTranspor
 
     private func removeInboundEventContinuation(id: UUID) {
         inboundEventContinuations[id] = nil
+    }
+
+    private func autoReplyBootstrapReceiverStatusIfNeeded(for command: CastEncodedCommand) throws {
+        guard command.route.namespace == .receiver else { return }
+        guard case let .utf8(payloadUTF8) = command.payload else { return }
+        let json = try JSONDecoder().decode([String: JSONValue].self, from: Data(payloadUTF8.utf8))
+        guard json["type"] == .string("GET_STATUS") else { return }
+        guard case let .number(requestID)? = json["requestId"] else { return }
+
+        let reply = CastInboundTransportEvent.utf8(
+            .init(
+                route: .init(sourceID: "receiver-0", destinationID: "sender-0", namespace: .receiver),
+                payloadUTF8: #"{"type":"RECEIVER_STATUS","requestId":\#(Int(requestID)),"status":{"volume":{"level":0.5,"muted":false}}}"#
+            )
+        )
+        for continuation in inboundEventContinuations.values {
+            continuation.yield(reply)
+        }
     }
 }
