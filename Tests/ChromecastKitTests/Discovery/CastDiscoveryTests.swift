@@ -122,6 +122,31 @@ struct CastDiscoveryTests {
         #expect(await browser.stopCount() == 1)
         #expect(await events.next() == .stopped)
     }
+
+    @Test("browser runtime error stops browsing and allows restart")
+    func browserRuntimeErrorStopsAndCanRestart() async throws {
+        let browser = RecordingDiscoveryBrowser()
+        let discovery = CastDiscovery(browser: browser)
+        var events = await discovery.events().makeAsyncIterator()
+
+        try await discovery.start()
+        #expect(await events.next() == .started)
+
+        await browser.emit(.error(.discoveryFailed("bonjour runtime error")))
+
+        let errorEvent = await events.next()
+        guard case let .error(error)? = errorEvent else {
+            Issue.record("Expected discovery error event")
+            return
+        }
+        #expect(error == .discoveryFailed("bonjour runtime error"))
+        #expect(await discovery.state() == .failed(.discoveryFailed("bonjour runtime error")))
+        #expect(await browser.stopCount() == 1)
+
+        try await discovery.start()
+        #expect(await discovery.state() == .running)
+        #expect(await browser.startCount() == 2)
+    }
 }
 
 private actor RecordingDiscoveryBrowser: CastDiscoveryBrowser {
@@ -161,6 +186,12 @@ private actor RecordingDiscoveryBrowser: CastDiscoveryBrowser {
 
     func stopCount() -> Int {
         stopCalls
+    }
+
+    func emit(_ event: CastDiscoveryBrowserEvent) {
+        for continuation in continuations.values {
+            continuation.yield(event)
+        }
     }
 
     private func removeContinuation(id: UUID) {

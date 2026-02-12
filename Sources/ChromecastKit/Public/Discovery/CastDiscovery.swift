@@ -143,20 +143,19 @@ public actor CastDiscovery {
         browserEventsTask = Task {
             let stream = await browser.events()
             for await event in stream {
-                self.handleBrowserEvent(event)
+                await self.handleBrowserEvent(event)
             }
         }
     }
 
-    private func handleBrowserEvent(_ event: CastDiscoveryBrowserEvent) {
+    private func handleBrowserEvent(_ event: CastDiscoveryBrowserEvent) async {
         switch event {
         case let .deviceUpserted(device):
             upsertDiscoveredDevice(device)
         case let .deviceRemoved(id):
             removeDiscoveredDevice(id: id)
         case let .error(error):
-            stateValue = .failed(error)
-            emit(.error(error))
+            await transitionToFailed(error)
         }
     }
 
@@ -197,5 +196,16 @@ public actor CastDiscovery {
             return
         }
         await stop()
+    }
+
+    private func transitionToFailed(_ error: CastError) async {
+        await browser.stop()
+        browserEventsTask?.cancel()
+        browserEventsTask = nil
+        browseTimeoutTask?.cancel()
+        browseTimeoutTask = nil
+        activeBrowseRunID = nil
+        stateValue = .failed(error)
+        emit(.error(error))
     }
 }
