@@ -212,6 +212,77 @@ struct CastSessionTests {
         #expect(lifecycle.disconnects >= 1)
     }
 
+    @Test("bootstrap command failure disconnects and emits error")
+    func bootstrapFailureDisconnectsSession() async throws {
+        let transport = TestSessionTransport()
+        await transport.failNextSend(
+            matching: .receiver,
+            with: .connectionFailed("bootstrap get status failed")
+        )
+        let device = CastDeviceDescriptor(
+            id: "device-1",
+            friendlyName: "Living Room",
+            host: "192.168.1.10",
+            port: 8009
+        )
+        let session = CastSessionRuntime(
+            device: device,
+            transport: transport,
+            configuration: .init(heartbeatInterval: 0, autoReconnect: false)
+        )
+        var events = await session.connectionEvents().makeAsyncIterator()
+
+        await #expect(throws: CastError.self) {
+            try await session.connect()
+        }
+
+        _ = try await nextConnectionEvent(&events) // connected
+        let errorEvent = try await nextConnectionEvent(&events)
+        let disconnectedEvent = try await nextConnectionEvent(&events)
+
+        guard case let .error(error) = errorEvent else {
+            Issue.record("Expected error event")
+            return
+        }
+        #expect(error == .connectionFailed("bootstrap get status failed"))
+        #expect(disconnectedEvent == .disconnected(reason: .networkError))
+        #expect(await session.connectionState() == .disconnected)
+    }
+
+    @Test("heartbeat send failure triggers network recovery when auto reconnect is disabled")
+    func heartbeatSendFailureTriggersRecovery() async throws {
+        let transport = TestSessionTransport()
+        let device = CastDeviceDescriptor(
+            id: "device-1",
+            friendlyName: "Living Room",
+            host: "192.168.1.10",
+            port: 8009
+        )
+        let session = CastSessionRuntime(
+            device: device,
+            transport: transport,
+            configuration: .init(heartbeatInterval: 0.01, autoReconnect: false)
+        )
+        var events = await session.connectionEvents().makeAsyncIterator()
+
+        try await session.connect()
+        _ = try await nextConnectionEvent(&events) // connected
+
+        await transport.failNextSend(matching: .heartbeat, with: .connectionFailed("heartbeat send failed"))
+        try await Task.sleep(nanoseconds: 150_000_000)
+
+        let errorEvent = try await nextConnectionEvent(&events)
+        let disconnectedEvent = try await nextConnectionEvent(&events)
+
+        guard case let .error(error) = errorEvent else {
+            Issue.record("Expected error event")
+            return
+        }
+        #expect(error == .connectionFailed("heartbeat send failed"))
+        #expect(disconnectedEvent == .disconnected(reason: .networkError))
+        #expect(await session.connectionState() == .disconnected)
+    }
+
     @Test("custom namespace messages are emitted to namespace subscribers")
     func customNamespaceMessagesStream() async throws {
         let transport = TestSessionTransport()
@@ -366,6 +437,7 @@ private actor TestSessionTransport: CastConnectionTransport, CastCommandTranspor
     private(set) var disconnectCount = 0
     private var sentCommands = [CastEncodedCommand]()
     private var inboundEventContinuations = [UUID: AsyncStream<CastInboundTransportEvent>.Continuation]()
+    private var nextSendFailures = [CastNamespace: CastError]()
 
     func connect(timeout _: TimeInterval) async throws {
         connectCount += 1
@@ -380,6 +452,9 @@ private actor TestSessionTransport: CastConnectionTransport, CastCommandTranspor
     }
 
     func send(_ command: CastEncodedCommand) async throws {
+        if let error = nextSendFailures.removeValue(forKey: command.route.namespace) {
+            throw error
+        }
         sentCommands.append(command)
         try autoReplyBootstrapReceiverStatusIfNeeded(for: command)
     }
@@ -406,6 +481,10 @@ private actor TestSessionTransport: CastConnectionTransport, CastCommandTranspor
 
     func lifecycle() -> (connects: Int, disconnects: Int) {
         (connectCount, disconnectCount)
+    }
+
+    func failNextSend(matching namespace: CastNamespace, with error: CastError) {
+        nextSendFailures[namespace] = error
     }
 
     private func removeInboundEventContinuation(id: UUID) {

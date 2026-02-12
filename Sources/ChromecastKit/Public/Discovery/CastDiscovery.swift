@@ -18,6 +18,8 @@ public actor CastDiscovery {
     private var devicesByID = [CastDeviceID: CastDeviceDescriptor]()
     private var eventContinuations = [UUID: AsyncStream<CastDiscoveryEvent>.Continuation]()
     private var browserEventsTask: Task<Void, Never>?
+    private var browseTimeoutTask: Task<Void, Never>?
+    private var activeBrowseRunID: UUID?
 
     public init(configuration: CastDiscoveryConfiguration = .init()) {
         self.init(configuration: configuration, browser: NWDNSSDDiscoveryBrowser())
@@ -77,11 +79,18 @@ public actor CastDiscovery {
         } catch {
             browserEventsTask?.cancel()
             browserEventsTask = nil
+            browseTimeoutTask?.cancel()
+            browseTimeoutTask = nil
+            activeBrowseRunID = nil
             let castError = mapDiscoveryError(error)
             stateValue = .failed(castError)
             emit(.error(castError))
             throw castError
         }
+
+        let runID = UUID()
+        activeBrowseRunID = runID
+        scheduleBrowseTimeoutIfNeeded(runID: runID)
     }
 
     /// Stops discovery browsing.
@@ -89,6 +98,9 @@ public actor CastDiscovery {
         await browser.stop()
         browserEventsTask?.cancel()
         browserEventsTask = nil
+        browseTimeoutTask?.cancel()
+        browseTimeoutTask = nil
+        activeBrowseRunID = nil
         stateValue = .stopped
         emit(.stopped)
     }
@@ -157,5 +169,33 @@ public actor CastDiscovery {
             return castError
         }
         return .discoveryFailed(String(describing: error))
+    }
+
+    private func scheduleBrowseTimeoutIfNeeded(runID: UUID) {
+        browseTimeoutTask?.cancel()
+        browseTimeoutTask = nil
+
+        guard let timeout = configuration.browseTimeout, timeout > 0 else {
+            return
+        }
+
+        browseTimeoutTask = Task {
+            let ns = UInt64(max(0, timeout) * 1_000_000_000)
+            try? await Task.sleep(nanoseconds: ns)
+            guard !Task.isCancelled else {
+                return
+            }
+            await self.handleBrowseTimeout(runID: runID)
+        }
+    }
+
+    private func handleBrowseTimeout(runID: UUID) async {
+        guard activeBrowseRunID == runID else {
+            return
+        }
+        guard stateValue == .running else {
+            return
+        }
+        await stop()
     }
 }

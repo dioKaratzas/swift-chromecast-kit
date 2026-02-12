@@ -103,6 +103,25 @@ struct CastDiscoveryTests {
         #expect(await browser.stopCount() == 1)
         #expect(await events.next() == .stopped)
     }
+
+    @Test("browse timeout auto-stops discovery")
+    func browseTimeoutStopsDiscovery() async throws {
+        let browser = RecordingDiscoveryBrowser()
+        let discovery = CastDiscovery(
+            configuration: .init(includeGroups: true, browseTimeout: 0.01),
+            browser: browser
+        )
+        var events = await discovery.events().makeAsyncIterator()
+
+        try await discovery.start()
+        #expect(await events.next() == .started)
+
+        try await Task.sleep(nanoseconds: 120_000_000)
+
+        #expect(await discovery.state() == .stopped)
+        #expect(await browser.stopCount() == 1)
+        #expect(await events.next() == .stopped)
+    }
 }
 
 private actor RecordingDiscoveryBrowser: CastDiscoveryBrowser {

@@ -104,10 +104,12 @@ actor CastSessionRuntime {
 
     func connect() async throws {
         try await connection.connect()
-        lastHeartbeatActivityAt = Date()
-        startInboundLoopIfNeeded()
-        try await bootstrapPlatformNamespaces()
-        startHeartbeatLoopIfNeeded()
+        do {
+            try await finishPostConnectBootstrap()
+        } catch {
+            await handleBootstrapFailure(error)
+            throw error
+        }
     }
 
     func disconnect(reason: CastDisconnectReason = .requested) async {
@@ -130,10 +132,12 @@ actor CastSessionRuntime {
         recoveryTask = nil
         connectedApplicationTransportID = nil
         try await connection.reconnect()
-        lastHeartbeatActivityAt = Date()
-        startInboundLoopIfNeeded()
-        try await bootstrapPlatformNamespaces()
-        startHeartbeatLoopIfNeeded()
+        do {
+            try await finishPostConnectBootstrap()
+        } catch {
+            await handleBootstrapFailure(error)
+            throw error
+        }
     }
 
     func connectionState() async -> CastConnectionState {
@@ -235,7 +239,11 @@ actor CastSessionRuntime {
         let matchedPendingReply = try await dispatcher.consumeInboundMessage(message)
         let handledStatus = try await statusProcessor.apply(message)
         if handledStatus {
-            try await synchronizeApplicationTransportBootstrapIfNeeded()
+            do {
+                try await synchronizeApplicationTransportBootstrapIfNeeded()
+            } catch {
+                await handleBackgroundRuntimeFailure(error, recoveryReason: .networkError)
+            }
         }
         emitNamespaceMessageIfNeeded(message)
         return handledHeartbeat || matchedPendingReply || handledStatus
@@ -356,6 +364,7 @@ actor CastSessionRuntime {
                         payload: CastWire.Heartbeat.Message(type: .ping)
                     )
                 } catch {
+                    await actor.handleBackgroundRuntimeFailure(error, recoveryReason: .networkError)
                     break
                 }
             }
@@ -418,10 +427,7 @@ actor CastSessionRuntime {
 
         do {
             try await connection.connect()
-            lastHeartbeatActivityAt = Date()
-            startInboundLoopIfNeeded()
-            try await bootstrapPlatformNamespaces()
-            startHeartbeatLoopIfNeeded()
+            try await finishPostConnectBootstrap()
         } catch {
             // Connection actor already emitted error state/event.
         }
@@ -475,5 +481,32 @@ actor CastSessionRuntime {
             lastHeartbeatActivityAt = Date()
             return true
         }
+    }
+
+    private func finishPostConnectBootstrap() async throws {
+        lastHeartbeatActivityAt = Date()
+        startInboundLoopIfNeeded()
+        try await bootstrapPlatformNamespaces()
+        startHeartbeatLoopIfNeeded()
+    }
+
+    private func handleBootstrapFailure(_ error: any Error) async {
+        let castError = (error as? CastError) ?? .connectionFailed(String(describing: error))
+        inboundTask?.cancel()
+        inboundTask = nil
+        heartbeatTask?.cancel()
+        heartbeatTask = nil
+        connectedApplicationTransportID = nil
+        await connection.reportRuntimeError(castError)
+        await connection.disconnect(reason: .networkError)
+    }
+
+    private func handleBackgroundRuntimeFailure(
+        _ error: any Error,
+        recoveryReason: CastDisconnectReason
+    ) async {
+        let castError = (error as? CastError) ?? .connectionFailed(String(describing: error))
+        await connection.reportRuntimeError(castError)
+        scheduleRecoveryIfNeeded(reason: recoveryReason)
     }
 }
