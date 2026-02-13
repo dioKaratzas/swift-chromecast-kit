@@ -80,6 +80,36 @@ struct CastSessionPublicAPITests {
         await session.disconnect(reason: .requested)
     }
 
+    @Test("namespaceEvents decodes binary JSON payloads when bytes are UTF-8")
+    func namespaceEventsBinaryJSONDecode() async throws {
+        let transport = PublicSessionTestTransport()
+        let runtime = CastSessionRuntime(
+            device: .init(id: "device-1", friendlyName: "Living Room", host: "192.168.1.10"),
+            transport: transport,
+            configuration: .init(heartbeatInterval: 0, autoReconnect: false)
+        )
+        let session = CastSession(runtime: runtime)
+
+        try await session.connect()
+        var iterator = await session.namespaceEvents("urn:x-cast:com.example.binary").makeAsyncIterator()
+
+        await transport.emitInboundEvent(
+            .binary(
+                .init(
+                    route: .init(sourceID: "web-42", destinationID: "sender-0", namespace: "urn:x-cast:com.example.binary"),
+                    payloadBinary: Data(#"{"type":"CUSTOM","value":7}"#.utf8)
+                )
+            )
+        )
+
+        let event = try #require(await iterator.next())
+        let json = try event.jsonObject()
+        #expect(json["type"] == .string("CUSTOM"))
+        #expect(json["value"] == .number(7))
+
+        await session.disconnect(reason: .requested)
+    }
+
     private func waitForCommand(
         on transport: PublicSessionTestTransport,
         requestID: CastRequestID,

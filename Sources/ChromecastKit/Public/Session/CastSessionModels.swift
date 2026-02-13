@@ -144,10 +144,15 @@ public extension CastSession {
         }
 
         public func decodePayload<T: Decodable & Sendable>(_ type: T.Type = T.self) throws -> T {
-            guard let payloadUTF8 else {
-                throw CastError.unsupportedFeature("Cannot decode binary namespace payload as JSON")
+            switch payload {
+            case let .utf8(payloadUTF8):
+                return try CastMessageJSONCodec.decodePayload(T.self, from: payloadUTF8)
+            case let .binary(payloadBinary):
+                guard let payloadUTF8 = String(data: payloadBinary, encoding: .utf8) else {
+                    throw CastError.unsupportedFeature("Cannot decode non-UTF8 binary namespace payload as JSON")
+                }
+                return try CastMessageJSONCodec.decodePayload(T.self, from: payloadUTF8)
             }
-            return try CastMessageJSONCodec.decodePayload(T.self, from: payloadUTF8)
         }
 
         public func jsonObject() throws -> [String: JSONValue] {
