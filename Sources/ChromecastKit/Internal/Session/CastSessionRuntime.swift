@@ -20,6 +20,7 @@ actor CastSessionRuntime {
     private let inboundEventTransport: (any CastInboundEventTransport)?
     private let heartbeatInterval: TimeInterval
     private let autoReconnect: Bool
+    private let reconnectRetryDelay: TimeInterval
     private var inboundTask: Task<Void, Never>?
     private var heartbeatTask: Task<Void, Never>?
     private var recoveryTask: Task<Void, Never>?
@@ -54,7 +55,8 @@ actor CastSessionRuntime {
         inboundTransport: (any CastInboundMessageTransport)? = nil,
         inboundEventTransport: (any CastInboundEventTransport)? = nil,
         heartbeatInterval: TimeInterval = 5,
-        autoReconnect: Bool = true
+        autoReconnect: Bool = true,
+        reconnectRetryDelay: TimeInterval = 1
     ) {
         self.device = device
         self.connection = connection
@@ -67,6 +69,7 @@ actor CastSessionRuntime {
         self.inboundEventTransport = inboundEventTransport
         self.heartbeatInterval = heartbeatInterval
         self.autoReconnect = autoReconnect
+        self.reconnectRetryDelay = reconnectRetryDelay
     }
 
     init(
@@ -98,7 +101,8 @@ actor CastSessionRuntime {
             inboundTransport: inboundTransport,
             inboundEventTransport: inboundEventTransport,
             heartbeatInterval: configuration.heartbeatInterval,
-            autoReconnect: configuration.autoReconnect
+            autoReconnect: configuration.autoReconnect,
+            reconnectRetryDelay: configuration.reconnectRetryDelay
         )
     }
 
@@ -425,11 +429,29 @@ actor CastSessionRuntime {
             return
         }
 
-        do {
-            try await connection.connect()
-            try await finishPostConnectBootstrap()
-        } catch {
-            // Connection actor already emitted error state/event.
+        while Task.isCancelled == false {
+            do {
+                try await connection.connect()
+                do {
+                    try await finishPostConnectBootstrap()
+                    return
+                } catch {
+                    await handleBootstrapFailure(error)
+                }
+            } catch {
+                // Connection actor already emitted error state/event.
+            }
+
+            guard reconnectRetryDelay > 0 else {
+                continue
+            }
+
+            do {
+                let ns = UInt64(max(0, reconnectRetryDelay) * 1_000_000_000)
+                try await Task.sleep(nanoseconds: ns)
+            } catch {
+                return
+            }
         }
     }
 

@@ -389,6 +389,46 @@ struct CastSessionTests {
         await session.disconnect(reason: .requested)
     }
 
+    @Test("auto reconnect retries after transient reconnect connect failure")
+    func autoReconnectRetriesAfterConnectFailure() async throws {
+        let transport = TestSessionTransport()
+        let device = CastDeviceDescriptor(
+            id: "device-1",
+            friendlyName: "Living Room",
+            host: "192.168.1.10",
+            port: 8009
+        )
+        let session = CastSessionRuntime(
+            device: device,
+            transport: transport,
+            configuration: .init(heartbeatInterval: 0, autoReconnect: true, reconnectRetryDelay: 0.01)
+        )
+        var events = await session.connectionEvents().makeAsyncIterator()
+
+        try await session.connect()
+        _ = try await nextConnectionEvent(&events) // connected
+
+        await transport.failNextConnect(with: .connectionFailed("transient reconnect failure"))
+        await transport.emitInboundEvent(.closed)
+
+        let first = try await nextConnectionEvent(&events)
+        let second = try await nextConnectionEvent(&events)
+        let third = try await nextConnectionEvent(&events)
+
+        #expect(first == .disconnected(reason: .remoteClosed))
+        guard case let .error(error) = second else {
+            Issue.record("Expected reconnect error event")
+            return
+        }
+        #expect(error == .connectionFailed("transient reconnect failure"))
+        #expect(third == .connected)
+
+        let lifecycle = await transport.lifecycle()
+        #expect(lifecycle.connects >= 3) // initial + failed retry + successful retry
+
+        await session.disconnect(reason: .requested)
+    }
+
     @Test("transport failure emits connection error and disconnect when auto reconnect is disabled")
     func transportFailureEmitsErrorAndDisconnects() async throws {
         let transport = TestSessionTransport()
@@ -438,9 +478,13 @@ private actor TestSessionTransport: CastConnectionTransport, CastCommandTranspor
     private var sentCommands = [CastEncodedCommand]()
     private var inboundEventContinuations = [UUID: AsyncStream<CastInboundTransportEvent>.Continuation]()
     private var nextSendFailures = [CastNamespace: CastError]()
+    private var nextConnectFailures = [CastError]()
 
     func connect(timeout _: TimeInterval) async throws {
         connectCount += 1
+        if nextConnectFailures.isEmpty == false {
+            throw nextConnectFailures.removeFirst()
+        }
     }
 
     func disconnect() async {
@@ -485,6 +529,10 @@ private actor TestSessionTransport: CastConnectionTransport, CastCommandTranspor
 
     func failNextSend(matching namespace: CastNamespace, with error: CastError) {
         nextSendFailures[namespace] = error
+    }
+
+    func failNextConnect(with error: CastError) {
+        nextConnectFailures.append(error)
     }
 
     private func removeInboundEventContinuation(id: UUID) {

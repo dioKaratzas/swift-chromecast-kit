@@ -11,17 +11,20 @@ struct CastConnectionConfiguration: Sendable, Hashable {
     var commandTimeout: TimeInterval
     var heartbeatInterval: TimeInterval
     var autoReconnect: Bool
+    var reconnectRetryDelay: TimeInterval
 
     init(
         connectTimeout: TimeInterval = 10,
         commandTimeout: TimeInterval = 10,
         heartbeatInterval: TimeInterval = 5,
-        autoReconnect: Bool = true
+        autoReconnect: Bool = true,
+        reconnectRetryDelay: TimeInterval = 1
     ) {
         self.connectTimeout = connectTimeout
         self.commandTimeout = commandTimeout
         self.heartbeatInterval = heartbeatInterval
         self.autoReconnect = autoReconnect
+        self.reconnectRetryDelay = reconnectRetryDelay
     }
 }
 

@@ -12,17 +12,20 @@ public extension CastSession {
         public var commandTimeout: TimeInterval
         public var heartbeatInterval: TimeInterval
         public var autoReconnect: Bool
+        public var reconnectRetryDelay: TimeInterval
 
         public init(
             connectTimeout: TimeInterval = 10,
             commandTimeout: TimeInterval = 10,
             heartbeatInterval: TimeInterval = 5,
-            autoReconnect: Bool = true
+            autoReconnect: Bool = true,
+            reconnectRetryDelay: TimeInterval = 1
         ) {
             self.connectTimeout = connectTimeout
             self.commandTimeout = commandTimeout
             self.heartbeatInterval = heartbeatInterval
             self.autoReconnect = autoReconnect
+            self.reconnectRetryDelay = reconnectRetryDelay
         }
     }
 
@@ -167,7 +170,8 @@ extension CastSession.Configuration {
             connectTimeout: connectTimeout,
             commandTimeout: commandTimeout,
             heartbeatInterval: heartbeatInterval,
-            autoReconnect: autoReconnect
+            autoReconnect: autoReconnect,
+            reconnectRetryDelay: reconnectRetryDelay
         )
     }
 }
