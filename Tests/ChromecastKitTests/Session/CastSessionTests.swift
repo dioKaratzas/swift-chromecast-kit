@@ -157,6 +157,47 @@ struct CastSessionTests {
         #expect(mediaGetStatusJSON["requestId"] == .number(1))
     }
 
+    @Test("receiver status app bootstrap failure emits error and disconnects")
+    func receiverStatusAppBootstrapFailureTriggersRecovery() async throws {
+        let transport = TestSessionTransport()
+        let device = CastDeviceDescriptor(
+            id: "device-1",
+            friendlyName: "Living Room",
+            host: "192.168.1.10",
+            port: 8009
+        )
+        let session = CastSessionRuntime(
+            device: device,
+            transport: transport,
+            configuration: .init(heartbeatInterval: 0, autoReconnect: false)
+        )
+        var events = await session.connectionEvents().makeAsyncIterator()
+
+        try await session.connect()
+        _ = try await nextConnectionEvent(&events) // connected
+
+        await transport.failNextSend(matching: .media, with: .connectionFailed("media bootstrap failed"))
+        let handled = try await session.applyInboundMessage(
+            .init(
+                route: .init(sourceID: "receiver-0", destinationID: "sender-0", namespace: .receiver),
+                payloadUTF8: #"""
+                {"type":"RECEIVER_STATUS","status":{"volume":{"level":0.5,"muted":false},"applications":[{"appId":"CC1AD845","displayName":"Default Media Receiver","sessionId":"SESSION-1","transportId":"web-42","statusText":"Ready","namespaces":[{"name":"urn:x-cast:com.google.cast.media"}]}]}}
+                """#
+            )
+        )
+
+        #expect(handled)
+        let errorEvent = try await nextConnectionEvent(&events)
+        let disconnectedEvent = try await nextConnectionEvent(&events)
+        guard case let .error(error) = errorEvent else {
+            Issue.record("Expected error event")
+            return
+        }
+        #expect(error == .connectionFailed("media bootstrap failed"))
+        #expect(disconnectedEvent == .disconnected(reason: .networkError))
+        #expect(await session.connectionState() == .disconnected)
+    }
+
     @Test("heartbeat ping messages are answered with pong")
     func heartbeatPingRespondsWithPong() async throws {
         let transport = TestSessionTransport()

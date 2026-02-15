@@ -347,6 +347,8 @@ actor CastCommandDispatcher {
             return .requestFailed(code: code, message: message)
         case "LOAD_FAILED":
             return .loadFailed(code: code, message: message)
+        case "NOT_ALLOWED", "NOT_SUPPORTED", "ERROR":
+            return .requestFailed(code: code, message: message)
         default:
             if type.hasSuffix("_FAILED") || type.hasPrefix("INVALID_") {
                 return .requestFailed(code: code, message: message)

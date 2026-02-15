@@ -238,6 +238,60 @@ struct CastCommandDispatcherTests {
         }
     }
 
+    @Test("sendAndAwaitReply maps NOT_ALLOWED and LOAD_FAILED reply variants")
+    func sendAndAwaitReplyMapsCommonErrorVariants() async throws {
+        let transport = RecordingCommandTransport()
+        let dispatcher = CastCommandDispatcher(transport: transport)
+
+        let notAllowedTask = Task {
+            try await dispatcher.sendAndAwaitReply(
+                namespace: .receiver,
+                target: .platform,
+                payload: CastReceiverPayloadBuilder.getStatus()
+            )
+        }
+        for _ in 0 ..< 10 {
+            if await transport.commands().count >= 1 { break }
+            await Task.yield()
+        }
+        _ = try await dispatcher.consumeInboundMessage(
+            .init(
+                route: .init(sourceID: "receiver-0", destinationID: "sender-0", namespace: .receiver),
+                payloadUTF8: #"{"type":"NOT_ALLOWED","requestId":1,"message":"denied","code":"403"}"#
+            )
+        )
+        do {
+            _ = try await notAllowedTask.value
+            Issue.record("Expected NOT_ALLOWED reply to throw")
+        } catch let error as CastError {
+            #expect(error == .requestFailed(code: 403, message: "denied"))
+        }
+
+        let loadFailedTask = Task {
+            try await dispatcher.sendAndAwaitReply(
+                namespace: .media,
+                target: .platform,
+                payload: CastReceiverPayloadBuilder.getStatus()
+            )
+        }
+        for _ in 0 ..< 10 {
+            if await transport.commands().count >= 2 { break }
+            await Task.yield()
+        }
+        _ = try await dispatcher.consumeInboundMessage(
+            .init(
+                route: .init(sourceID: "receiver-0", destinationID: "sender-0", namespace: .media),
+                payloadUTF8: #"{"type":"LOAD_FAILED","requestId":2,"reason":"load failed","detailedErrorCode":12}"#
+            )
+        )
+        do {
+            _ = try await loadFailedTask.value
+            Issue.record("Expected LOAD_FAILED reply to throw")
+        } catch let error as CastError {
+            #expect(error == .loadFailed(code: 12, message: "load failed"))
+        }
+    }
+
     @Test("binary tracked sends inject requestId into json bytes")
     func sendBinaryInjectsRequestID() async throws {
         let transport = RecordingCommandTransport()
