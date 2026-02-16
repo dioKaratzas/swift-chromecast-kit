@@ -147,6 +147,55 @@ struct CastDiscoveryTests {
         #expect(await discovery.state() == .running)
         #expect(await browser.startCount() == 2)
     }
+
+    @Test("lookup helpers find devices by id and friendly name")
+    func deviceLookupHelpers() async {
+        let browser = RecordingDiscoveryBrowser()
+        let discovery = CastDiscovery(browser: browser)
+        let device = CastDeviceDescriptor(
+            id: "device-1",
+            friendlyName: "Living Room TV",
+            host: "192.168.1.20"
+        )
+
+        await discovery.upsertDiscoveredDevice(device)
+
+        #expect(await discovery.device(id: "device-1") == device)
+        #expect(await discovery.device(named: "Living Room TV") == device)
+        #expect(await discovery.device(named: "living room tv") == device)
+        #expect(await discovery.device(named: "living room tv", caseInsensitive: false) == nil)
+    }
+
+    @Test("waitForDevice returns when matching device is discovered")
+    func waitForDeviceByName() async throws {
+        let browser = RecordingDiscoveryBrowser()
+        let discovery = CastDiscovery(browser: browser)
+
+        let waiter = Task {
+            try await discovery.waitForDevice(named: "Kitchen Speaker", timeout: 1)
+        }
+
+        await discovery.upsertDiscoveredDevice(
+            .init(
+                id: "kitchen-1",
+                friendlyName: "Kitchen Speaker",
+                host: "192.168.1.44"
+            )
+        )
+
+        let resolved = try await waiter.value
+        #expect(resolved.id == "kitchen-1")
+    }
+
+    @Test("waitForDevice times out when no matching device arrives")
+    func waitForDeviceTimeout() async {
+        let browser = RecordingDiscoveryBrowser()
+        let discovery = CastDiscovery(browser: browser)
+
+        await #expect(throws: CastError.self) {
+            try await discovery.waitForDevice(id: "missing-device", timeout: 0.01)
+        }
+    }
 }
 
 private actor RecordingDiscoveryBrowser: CastDiscoveryBrowser {

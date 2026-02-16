@@ -48,6 +48,26 @@ public actor CastDiscovery {
         }
     }
 
+    /// Returns a discovered device by Cast device ID if present in the current snapshot.
+    public func device(id: CastDeviceID) -> CastDeviceDescriptor? {
+        devicesByID[id]
+    }
+
+    /// Returns the first discovered device whose friendly name matches the provided value.
+    ///
+    /// Matching is case-insensitive by default to support user-entered device names.
+    public func device(
+        named name: String,
+        caseInsensitive: Bool = true
+    ) -> CastDeviceDescriptor? {
+        devices().first { device in
+            if caseInsensitive {
+                return device.friendlyName.compare(name, options: [.caseInsensitive, .diacriticInsensitive]) == .orderedSame
+            }
+            return device.friendlyName == name
+        }
+    }
+
     /// Subscribes to discovery lifecycle and device change events.
     public func events() -> AsyncStream<CastDiscoveryEvent> {
         let id = UUID()
@@ -57,6 +77,61 @@ public actor CastDiscovery {
             continuation.onTermination = { [id] _ in
                 Task { await self.removeEventContinuation(id: id) }
             }
+        }
+    }
+
+    /// Waits until a device with the provided Cast device ID is discovered.
+    ///
+    /// If a matching device is already in the snapshot, it is returned immediately.
+    public func waitForDevice(
+        id: CastDeviceID,
+        timeout: TimeInterval? = nil
+    ) async throws -> CastDeviceDescriptor {
+        if let existing = device(id: id) {
+            return existing
+        }
+
+        let stream = events()
+        return try await waitForDeviceFromEvents(
+            stream,
+            timeout: timeout,
+            operationDescription: "discover device \(id.rawValue)"
+        ) { event in
+            guard case let .deviceUpserted(device, _) = event, device.id == id else {
+                return nil
+            }
+            return device
+        }
+    }
+
+    /// Waits until a device with the provided friendly name is discovered.
+    ///
+    /// Matching is case-insensitive by default to support user-entered device names.
+    public func waitForDevice(
+        named name: String,
+        caseInsensitive: Bool = true,
+        timeout: TimeInterval? = nil
+    ) async throws -> CastDeviceDescriptor {
+        if let existing = device(named: name, caseInsensitive: caseInsensitive) {
+            return existing
+        }
+
+        let stream = events()
+        return try await waitForDeviceFromEvents(
+            stream,
+            timeout: timeout,
+            operationDescription: "discover device named \(name)"
+        ) { event in
+            guard case let .deviceUpserted(device, _) = event else {
+                return nil
+            }
+            let matches: Bool
+            if caseInsensitive {
+                matches = device.friendlyName.compare(name, options: [.caseInsensitive, .diacriticInsensitive]) == .orderedSame
+            } else {
+                matches = device.friendlyName == name
+            }
+            return matches ? device : nil
         }
     }
 
@@ -207,5 +282,37 @@ public actor CastDiscovery {
         activeBrowseRunID = nil
         stateValue = .failed(error)
         emit(.error(error))
+    }
+
+    private func waitForDeviceFromEvents(
+        _ stream: AsyncStream<CastDiscoveryEvent>,
+        timeout: TimeInterval?,
+        operationDescription: String,
+        matcher: @escaping @Sendable (CastDiscoveryEvent) -> CastDeviceDescriptor?
+    ) async throws -> CastDeviceDescriptor {
+        try await withThrowingTaskGroup(of: CastDeviceDescriptor.self) { group in
+            group.addTask {
+                for await event in stream {
+                    if let device = matcher(event) {
+                        return device
+                    }
+                }
+                throw CastError.disconnected
+            }
+
+            if let timeout, timeout > 0 {
+                group.addTask {
+                    try await Task.sleep(nanoseconds: UInt64(timeout * 1_000_000_000))
+                    throw CastError.timeout(operation: operationDescription)
+                }
+            }
+
+            guard let device = try await group.next() else {
+                throw CastError.timeout(operation: operationDescription)
+            }
+
+            group.cancelAll()
+            return device
+        }
     }
 }
