@@ -137,12 +137,16 @@ public extension CastSession {
         }
 
         public var payloadUTF8: String? {
-            guard case let .utf8(value) = payload else { return nil }
+            guard case let .utf8(value) = payload else {
+                return nil
+            }
             return value
         }
 
         public var payloadBinary: Data? {
-            guard case let .binary(value) = payload else { return nil }
+            guard case let .binary(value) = payload else {
+                return nil
+            }
             return value
         }
 

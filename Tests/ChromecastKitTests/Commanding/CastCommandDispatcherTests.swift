@@ -222,7 +222,9 @@ struct CastCommandDispatcherTests {
         }
 
         for _ in 0 ..< 10 {
-            if await transport.commands().isEmpty == false { break }
+            if await transport.commands().isEmpty == false {
+                break
+            }
             await Task.yield()
         }
 
@@ -251,7 +253,9 @@ struct CastCommandDispatcherTests {
             )
         }
         for _ in 0 ..< 10 {
-            if await transport.commands().count >= 1 { break }
+            if await transport.commands().count >= 1 {
+                break
+            }
             await Task.yield()
         }
         _ = try await dispatcher.consumeInboundMessage(
@@ -275,7 +279,9 @@ struct CastCommandDispatcherTests {
             )
         }
         for _ in 0 ..< 10 {
-            if await transport.commands().count >= 2 { break }
+            if await transport.commands().count >= 2 {
+                break
+            }
             await Task.yield()
         }
         _ = try await dispatcher.consumeInboundMessage(

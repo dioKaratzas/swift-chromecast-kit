@@ -3,8 +3,8 @@
 //  Swift package for Google Cast (Chromecast).
 //
 
-import Foundation
 import Testing
+import Foundation
 @testable import ChromecastKit
 
 @Suite("Cast Session Public API", .serialized)
@@ -67,7 +67,11 @@ struct CastSessionPublicAPITests {
         await transport.emitInboundEvent(
             .binary(
                 .init(
-                    route: .init(sourceID: "web-42", destinationID: "sender-0", namespace: "urn:x-cast:com.example.binary"),
+                    route: .init(
+                        sourceID: "web-42",
+                        destinationID: "sender-0",
+                        namespace: "urn:x-cast:com.example.binary"
+                    ),
                     payloadBinary: Data([0xDE, 0xAD])
                 )
             )
@@ -96,7 +100,11 @@ struct CastSessionPublicAPITests {
         await transport.emitInboundEvent(
             .binary(
                 .init(
-                    route: .init(sourceID: "web-42", destinationID: "sender-0", namespace: "urn:x-cast:com.example.binary"),
+                    route: .init(
+                        sourceID: "web-42",
+                        destinationID: "sender-0",
+                        namespace: "urn:x-cast:com.example.binary"
+                    ),
                     payloadBinary: Data(#"{"type":"CUSTOM","value":7}"#.utf8)
                 )
             )
@@ -123,11 +131,13 @@ struct CastSessionPublicAPITests {
             }
             try? await Task.sleep(nanoseconds: 1_000_000)
         }
-        return (await transport.commands()).first(where: { $0.requestID == requestID })
+        return await (transport.commands()).first(where: { $0.requestID == requestID })
     }
 
     private func extractRequestID(_ value: JSONValue) -> Int? {
-        guard case let .number(number) = value else { return nil }
+        guard case let .number(number) = value else {
+            return nil
+        }
         return Int(number)
     }
 }
@@ -180,12 +190,20 @@ private actor PublicSessionTestTransport: CastConnectionTransport, CastCommandTr
     }
 
     private func autoReplyBootstrapReceiverStatusIfNeeded(for command: CastEncodedCommand) throws {
-        guard command.route.namespace == .receiver else { return }
-        guard case let .utf8(payloadUTF8) = command.payload else { return }
+        guard command.route.namespace == .receiver else {
+            return
+        }
+        guard case let .utf8(payloadUTF8) = command.payload else {
+            return
+        }
 
         let json = try JSONDecoder().decode([String: JSONValue].self, from: Data(payloadUTF8.utf8))
-        guard json["type"] == .string("GET_STATUS") else { return }
-        guard case let .number(requestID)? = json["requestId"] else { return }
+        guard json["type"] == .string("GET_STATUS") else {
+            return
+        }
+        guard case let .number(requestID)? = json["requestId"] else {
+            return
+        }
 
         let reply = CastInboundTransportEvent.utf8(
             .init(

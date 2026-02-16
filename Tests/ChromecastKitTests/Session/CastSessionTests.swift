@@ -581,11 +581,19 @@ private actor TestSessionTransport: CastConnectionTransport, CastCommandTranspor
     }
 
     private func autoReplyBootstrapReceiverStatusIfNeeded(for command: CastEncodedCommand) throws {
-        guard command.route.namespace == .receiver else { return }
-        guard case let .utf8(payloadUTF8) = command.payload else { return }
+        guard command.route.namespace == .receiver else {
+            return
+        }
+        guard case let .utf8(payloadUTF8) = command.payload else {
+            return
+        }
         let json = try JSONDecoder().decode([String: JSONValue].self, from: Data(payloadUTF8.utf8))
-        guard json["type"] == .string("GET_STATUS") else { return }
-        guard case let .number(requestID)? = json["requestId"] else { return }
+        guard json["type"] == .string("GET_STATUS") else {
+            return
+        }
+        guard case let .number(requestID)? = json["requestId"] else {
+            return
+        }
 
         let reply = CastInboundTransportEvent.utf8(
             .init(

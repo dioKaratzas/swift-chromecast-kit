@@ -7,13 +7,13 @@ import SwiftUI
 
 @main
 struct ExampleApp: App {
-    @State private var model = DiscoveryFeatureModel()
+    @State private var model = ShowcaseAppModel()
 
     var body: some Scene {
         WindowGroup("ChromecastKit Example") {
-            DiscoveryFeatureView(model: model)
-                .frame(minWidth: 900, minHeight: 560)
+            ShowcaseRootView(model: model)
+                .frame(minWidth: 1120, minHeight: 700)
         }
-        .defaultSize(width: 980, height: 620)
+        .defaultSize(width: 1240, height: 760)
     }
 }

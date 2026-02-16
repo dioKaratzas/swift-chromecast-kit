@@ -5,6 +5,7 @@
 
 @preconcurrency import Network
 import Dispatch
+import Security
 import Foundation
 
 /// Internal Cast v2 transport implemented on top of `NWConnection` (TLS over TCP/8009).
@@ -57,7 +58,17 @@ actor NWTLSCastV2Transport: CastConnectionTransport, CastCommandTransport, CastI
             throw CastError.invalidArgument("Invalid Cast port: \(device.port)")
         }
 
-        let parameters = NWParameters.tls
+        let tlsOptions = NWProtocolTLS.Options()
+        // Chromecast Cast v2 uses a device-presented certificate chain that is not validated
+        // like a public WebPKI endpoint. Cast senders are expected to establish the TLS channel
+        // and then rely on the Cast protocol/session handshake rather than standard HTTPS trust.
+        sec_protocol_options_set_verify_block(
+            tlsOptions.securityProtocolOptions,
+            { _, _, complete in complete(true) },
+            callbackQueue
+        )
+
+        let parameters = NWParameters(tls: tlsOptions, tcp: NWProtocolTCP.Options())
         parameters.includePeerToPeer = false
         let connection = NWConnection(host: endpointHost, port: endpointPort, using: parameters)
 
