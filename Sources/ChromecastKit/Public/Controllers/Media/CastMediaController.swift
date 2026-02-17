@@ -187,6 +187,30 @@ public actor CastMediaController {
         )
     }
 
+    /// Convenience receiver-level volume control while working in the media workflow.
+    ///
+    /// This sends a platform `SET_VOLUME` request on the receiver namespace.
+    @discardableResult
+    public func setVolume(level: Double) async throws -> CastRequestID {
+        try await dispatcher.send(
+            namespace: .receiver,
+            target: .platform,
+            payload: CastReceiverPayloadBuilder.setVolume(level: level)
+        )
+    }
+
+    /// Convenience receiver-level mute control while working in the media workflow.
+    ///
+    /// This sends a platform `SET_VOLUME` request with the `muted` field.
+    @discardableResult
+    public func setMuted(_ muted: Bool) async throws -> CastRequestID {
+        try await dispatcher.send(
+            namespace: .receiver,
+            target: .platform,
+            payload: CastReceiverPayloadBuilder.setMuted(muted)
+        )
+    }
+
     /// Enables a text track by Cast track ID.
     @discardableResult
     public func enableTextTrack(id: CastMediaTrackID) async throws -> CastRequestID {
@@ -365,6 +389,22 @@ public actor CastMediaController {
                 )
             )
         )
+    }
+
+    /// Advances to the next queue item in the current media session.
+    ///
+    /// Cast models this as a queue update with a positive `jump`.
+    @discardableResult
+    public func queueNext() async throws -> CastRequestID {
+        try await queueUpdate(options: .init(jump: 1))
+    }
+
+    /// Moves to the previous queue item in the current media session.
+    ///
+    /// Cast models this as a queue update with a negative `jump`.
+    @discardableResult
+    public func queuePrevious() async throws -> CastRequestID {
+        try await queueUpdate(options: .init(jump: -1))
     }
 
     private func requireMediaSessionID() throws -> CastMediaSessionID {

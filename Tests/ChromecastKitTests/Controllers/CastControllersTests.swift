@@ -135,9 +135,11 @@ struct CastControllersTests {
         _ = try await mediaController.queueRemove(itemIDs: [11, 12])
         _ = try await mediaController.queueReorder(itemIDs: [12, 13], options: .init(insertBeforeItemID: 20))
         _ = try await mediaController.queueUpdate(options: .init(jump: 1))
+        _ = try await mediaController.queueNext()
+        _ = try await mediaController.queuePrevious()
 
         let commands = await transport.commands()
-        #expect(commands.count == 5)
+        #expect(commands.count == 7)
 
         let jsons = try commands.map { try decodeJSON($0.payloadUTF8) }
         #expect(jsons[0]["type"] == .string("QUEUE_LOAD"))
@@ -150,6 +152,30 @@ struct CastControllersTests {
         #expect(jsons[3]["insertBefore"] == .number(20))
         #expect(jsons[4]["type"] == .string("QUEUE_UPDATE"))
         #expect(jsons[4]["jump"] == .number(1))
+        #expect(jsons[5]["type"] == .string("QUEUE_UPDATE"))
+        #expect(jsons[5]["jump"] == .number(1))
+        #expect(jsons[6]["type"] == .string("QUEUE_UPDATE"))
+        #expect(jsons[6]["jump"] == .number(-1))
+    }
+
+    @Test("media controller exposes receiver volume and mute convenience commands")
+    func mediaControllerReceiverVolumeConvenience() async throws {
+        let transport = RecordingCommandTransport()
+        let dispatcher = CastCommandDispatcher(transport: transport)
+        let mediaController = CastMediaController(dispatcher: dispatcher)
+
+        _ = try await mediaController.setVolume(level: 0.25)
+        _ = try await mediaController.setMuted(true)
+
+        let commands = await transport.commands()
+        #expect(commands.count == 2)
+        #expect(commands[0].route.namespace == .receiver)
+        #expect(commands[0].route.destinationID == "receiver-0")
+        #expect(commands[1].route.namespace == .receiver)
+
+        let jsons = try commands.map { try decodeJSON($0.payloadUTF8) }
+        #expect(jsons[0]["type"] == .string("SET_VOLUME"))
+        #expect(jsons[1]["type"] == .string("SET_VOLUME"))
     }
 
     @Test("media controller session-bound commands require media session id")

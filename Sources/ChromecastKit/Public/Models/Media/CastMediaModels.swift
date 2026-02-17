@@ -367,6 +367,50 @@ public struct CastMediaItem: Sendable, Hashable, Codable {
         self.textTrackStyle = textTrackStyle
         self.customData = customData
     }
+
+    /// Convenience constructor for video content.
+    public static func video(
+        url: URL,
+        contentType: String = "video/mp4",
+        title: String? = nil,
+        subtitle: String? = nil,
+        images: [CastImage] = [],
+        textTracks: [CastTextTrack] = [],
+        textTrackStyle: CastTextTrackStyle? = nil,
+        customData: JSONValue? = nil
+    ) -> Self {
+        .init(
+            contentURL: url,
+            contentType: contentType,
+            streamType: .buffered,
+            metadata: .generic(title: title, subtitle: subtitle, images: images),
+            textTracks: textTracks,
+            textTrackStyle: textTrackStyle,
+            customData: customData
+        )
+    }
+
+    /// Convenience constructor for audio content.
+    public static func audio(
+        url: URL,
+        contentType: String = "audio/mpeg",
+        title: String? = nil,
+        subtitle: String? = nil,
+        images: [CastImage] = [],
+        textTracks: [CastTextTrack] = [],
+        textTrackStyle: CastTextTrackStyle? = nil,
+        customData: JSONValue? = nil
+    ) -> Self {
+        .init(
+            contentURL: url,
+            contentType: contentType,
+            streamType: .buffered,
+            metadata: .generic(title: title, subtitle: subtitle, images: images),
+            textTracks: textTracks,
+            textTrackStyle: textTrackStyle,
+            customData: customData
+        )
+    }
 }
 
 /// Queue repeat behavior supported by the Cast media queue APIs.

@@ -48,6 +48,27 @@ struct ModelFoundationTests {
         #expect(value.images.first?.url == imageURL)
     }
 
+    @Test("media item convenience factories build generic video and audio items")
+    func mediaItemFactoryHelpers() throws {
+        let videoURL = try #require(URL(string: "https://example.com/video.mp4"))
+        let audioURL = try #require(URL(string: "https://example.com/song.mp3"))
+
+        let video = CastMediaItem.video(url: videoURL, title: "Video", subtitle: "Demo")
+        let audio = CastMediaItem.audio(url: audioURL, title: "Song")
+
+        #expect(video.contentURL == videoURL)
+        #expect(video.contentType == "video/mp4")
+        #expect(audio.contentURL == audioURL)
+        #expect(audio.contentType == "audio/mpeg")
+
+        guard case let .generic(videoMetadata) = video.metadata else {
+            Issue.record("Expected generic metadata for video helper")
+            return
+        }
+        #expect(videoMetadata.title == "Video")
+        #expect(videoMetadata.subtitle == "Demo")
+    }
+
     @Test("JSONValue round-trips nested objects and arrays")
     func jsonValueRoundTrip() throws {
         let value = JSONValue.object([
