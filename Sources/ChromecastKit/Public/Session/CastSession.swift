@@ -14,6 +14,7 @@ public actor CastSession {
     public nonisolated let device: CastDeviceDescriptor
     public nonisolated let media: CastMediaController
     public nonisolated let receiver: CastReceiverController
+    public nonisolated let multizone: CastMultizoneController
 
     private let runtime: CastSessionRuntime
 
@@ -33,6 +34,7 @@ public actor CastSession {
         self.runtime = runtime
         self.media = runtime.media
         self.receiver = runtime.receiver
+        self.multizone = runtime.multizone
     }
 
     init(runtime: CastSessionRuntime) {
@@ -40,6 +42,7 @@ public actor CastSession {
         self.runtime = runtime
         self.media = runtime.media
         self.receiver = runtime.receiver
+        self.multizone = runtime.multizone
     }
 
     /// Establishes the Cast transport connection.
@@ -76,6 +79,11 @@ public actor CastSession {
     /// Returns the latest known media status, if any.
     public func mediaStatus() async -> CastMediaStatus? {
         await runtime.mediaStatus()
+    }
+
+    /// Returns the latest known multizone/group status, if any.
+    public func multizoneStatus() async -> CastMultizoneStatus? {
+        await runtime.multizoneStatus()
     }
 
     /// Returns the latest known receiver/media status snapshot.

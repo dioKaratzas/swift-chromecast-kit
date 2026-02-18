@@ -11,6 +11,7 @@ actor CastSessionRuntime {
     nonisolated let device: CastDeviceDescriptor
     nonisolated let media: CastMediaController
     nonisolated let receiver: CastReceiverController
+    nonisolated let multizone: CastMultizoneController
 
     private let connection: CastConnection
     private let stateStore: CastSessionStateStore
@@ -50,6 +51,7 @@ actor CastSessionRuntime {
         dispatcher: CastCommandDispatcher,
         media: CastMediaController,
         receiver: CastReceiverController,
+        multizone: CastMultizoneController,
         stateStore: CastSessionStateStore,
         statusProcessor: CastStatusMessageProcessor,
         inboundTransport: (any CastInboundMessageTransport)? = nil,
@@ -63,6 +65,7 @@ actor CastSessionRuntime {
         self.dispatcher = dispatcher
         self.media = media
         self.receiver = receiver
+        self.multizone = multizone
         self.stateStore = stateStore
         self.statusProcessor = statusProcessor
         self.inboundTransport = inboundTransport
@@ -82,6 +85,7 @@ actor CastSessionRuntime {
         let media = CastMediaController(dispatcher: dispatcher)
         let receiver = CastReceiverController(dispatcher: dispatcher)
         let stateStore = CastSessionStateStore()
+        let multizone = CastMultizoneController(dispatcher: dispatcher, stateStore: stateStore)
         let statusProcessor = CastStatusMessageProcessor(
             stateStore: stateStore,
             dispatcher: dispatcher,
@@ -96,6 +100,7 @@ actor CastSessionRuntime {
             dispatcher: dispatcher,
             media: media,
             receiver: receiver,
+            multizone: multizone,
             stateStore: stateStore,
             statusProcessor: statusProcessor,
             inboundTransport: inboundTransport,
@@ -162,6 +167,10 @@ actor CastSessionRuntime {
 
     func snapshot() async -> CastSessionStateSnapshot {
         await stateStore.snapshot()
+    }
+
+    func multizoneStatus() async -> CastMultizoneStatus? {
+        await stateStore.multizoneStatus()
     }
 
     func stateEvents() async -> AsyncStream<CastSessionStateEvent> {
@@ -338,6 +347,18 @@ actor CastSessionRuntime {
             target: .platform,
             payload: CastReceiverPayloadBuilder.getStatus()
         )
+        if device.capabilities.contains(.group) || device.capabilities.contains(.multizone) {
+            _ = try? await dispatcher.send(
+                namespace: .multizone,
+                target: .platform,
+                payload: CastMultizonePayloadBuilder.getStatus()
+            )
+            _ = try? await dispatcher.send(
+                namespace: .multizone,
+                target: .platform,
+                payload: CastMultizonePayloadBuilder.getCastingGroups()
+            )
+        }
     }
 
     private func startHeartbeatLoopIfNeeded() {

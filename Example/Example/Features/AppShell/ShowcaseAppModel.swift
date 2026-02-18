@@ -482,15 +482,32 @@ final class ShowcaseAppModel {
     private func handleStateEvent(_ event: CastSession.StateEvent) {
         switch event {
         case let .receiverStatusUpdated(status):
-            sessionSnapshot = .init(receiverStatus: status, mediaStatus: sessionSnapshot.mediaStatus)
+            sessionSnapshot = .init(
+                receiverStatus: status,
+                mediaStatus: sessionSnapshot.mediaStatus,
+                multizoneStatus: sessionSnapshot.multizoneStatus
+            )
             syncReceiverControlsFromSnapshot()
             if let app = status?.app {
                 appendSessionLog("Receiver app: \(app.displayName) (\(app.appID.rawValue))")
             }
         case let .mediaStatusUpdated(status):
-            sessionSnapshot = .init(receiverStatus: sessionSnapshot.receiverStatus, mediaStatus: status)
+            sessionSnapshot = .init(
+                receiverStatus: sessionSnapshot.receiverStatus,
+                mediaStatus: status,
+                multizoneStatus: sessionSnapshot.multizoneStatus
+            )
             if let status {
                 appendSessionLog("Media status: \(status.playerState.rawValue) t=\(Int(status.currentTime))s")
+            }
+        case let .multizoneStatusUpdated(status):
+            sessionSnapshot = .init(
+                receiverStatus: sessionSnapshot.receiverStatus,
+                mediaStatus: sessionSnapshot.mediaStatus,
+                multizoneStatus: status
+            )
+            if let status {
+                appendSessionLog("Multizone: \(status.members.count) members, \(status.castingGroups.count) groups")
             }
         }
     }

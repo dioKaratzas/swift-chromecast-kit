@@ -9,13 +9,16 @@ import Foundation
 struct CastSessionStateSnapshot: Sendable, Hashable {
     let receiverStatus: CastReceiverStatus?
     let mediaStatus: CastMediaStatus?
+    let multizoneStatus: CastMultizoneStatus?
 
     init(
         receiverStatus: CastReceiverStatus? = nil,
-        mediaStatus: CastMediaStatus? = nil
+        mediaStatus: CastMediaStatus? = nil,
+        multizoneStatus: CastMultizoneStatus? = nil
     ) {
         self.receiverStatus = receiverStatus
         self.mediaStatus = mediaStatus
+        self.multizoneStatus = multizoneStatus
     }
 }
 
@@ -23,4 +26,5 @@ struct CastSessionStateSnapshot: Sendable, Hashable {
 enum CastSessionStateEvent: Sendable, Hashable {
     case receiverStatusUpdated(CastReceiverStatus?)
     case mediaStatusUpdated(CastMediaStatus?)
+    case multizoneStatusUpdated(CastMultizoneStatus?)
 }

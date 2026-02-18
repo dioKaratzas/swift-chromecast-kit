@@ -119,6 +119,52 @@ struct CastStatusMessageProcessorTests {
         #expect(!handled)
         #expect(await stateStore.snapshot() == .init())
     }
+
+    @Test("multizone messages update members and casting groups state")
+    func multizoneMessagesUpdateState() async throws {
+        let transport = RecordingCommandTransport()
+        let dispatcher = CastCommandDispatcher(transport: transport)
+        let mediaController = CastMediaController(dispatcher: dispatcher)
+        let stateStore = CastSessionStateStore()
+        let processor = CastStatusMessageProcessor(
+            stateStore: stateStore,
+            dispatcher: dispatcher,
+            mediaController: mediaController
+        )
+
+        let statusHandled = try await processor.apply(
+            .init(
+                route: .init(sourceID: "receiver-0", destinationID: "sender-0", namespace: .multizone),
+                payloadUTF8: #"""
+                {"type":"MULTIZONE_STATUS","status":{"devices":[{"deviceId":"a","name":"Kitchen"},{"deviceId":"b","name":"Office"}]}}
+                """#
+            )
+        )
+        #expect(statusHandled)
+
+        let groupsHandled = try await processor.apply(
+            .init(
+                route: .init(sourceID: "receiver-0", destinationID: "sender-0", namespace: .multizone),
+                payloadUTF8: #"""
+                {"type":"CASTING_GROUPS","groups":[{"deviceId":"group-1","name":"Downstairs"}]}
+                """#
+            )
+        )
+        #expect(groupsHandled)
+
+        let removedHandled = try await processor.apply(
+            .init(
+                route: .init(sourceID: "receiver-0", destinationID: "sender-0", namespace: .multizone),
+                payloadUTF8: #"{"type":"DEVICE_REMOVED","deviceId":"b"}"#
+            )
+        )
+        #expect(removedHandled)
+
+        let status = try #require(await stateStore.multizoneStatus())
+        #expect(status.members.map(\.id) == ["a"])
+        #expect(status.members.map(\.name) == ["Kitchen"])
+        #expect(status.castingGroups == [.init(id: "group-1", name: "Downstairs")])
+    }
 }
 
 private actor RecordingCommandTransport: CastCommandTransport {

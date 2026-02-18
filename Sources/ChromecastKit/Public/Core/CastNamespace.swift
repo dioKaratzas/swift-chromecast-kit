@@ -32,12 +32,14 @@ public struct CastNamespace: RawRepresentable, ExpressibleByStringLiteral, Senda
     public static let receiver = Self("urn:x-cast:com.google.cast.receiver")
     /// Default Media Receiver namespace.
     public static let media = Self("urn:x-cast:com.google.cast.media")
+    /// Cast multizone namespace used by speaker groups.
+    public static let multizone = Self("urn:x-cast:com.google.cast.multizone")
 }
 
 extension CastNamespace {
     var isCoreChromecastNamespace: Bool {
         switch self {
-        case .connection, .heartbeat, .receiver, .media:
+        case .connection, .heartbeat, .receiver, .media, .multizone:
             true
         default:
             false

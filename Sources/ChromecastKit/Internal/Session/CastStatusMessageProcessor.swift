@@ -47,6 +47,53 @@ actor CastStatusMessageProcessor {
             await mediaController.setMediaSessionID(status?.mediaSessionID)
             return true
 
+        case (.multizone, CastMultizoneMessageType.multizoneStatus.rawValue):
+            let response = try CastMessageJSONCodec.decodePayload(CastWire.Multizone.StatusResponse.self, from: message)
+            await stateStore.setMultizoneStatus(
+                updateMultizoneStatus(
+                    current: await stateStore.multizoneStatus(),
+                    replacingMembersWith: response.status.devices ?? []
+                )
+            )
+            return true
+
+        case (.multizone, CastMultizoneMessageType.deviceAdded.rawValue),
+             (.multizone, CastMultizoneMessageType.deviceUpdated.rawValue):
+            let response = try CastMessageJSONCodec.decodePayload(CastWire.Multizone.DeviceDeltaResponse.self, from: message)
+            guard let device = response.device else {
+                return true
+            }
+            await stateStore.setMultizoneStatus(
+                updateMultizoneStatus(
+                    current: await stateStore.multizoneStatus(),
+                    upsertingMember: device
+                )
+            )
+            return true
+
+        case (.multizone, CastMultizoneMessageType.deviceRemoved.rawValue):
+            let response = try CastMessageJSONCodec.decodePayload(CastWire.Multizone.DeviceDeltaResponse.self, from: message)
+            guard let deviceID = response.deviceId else {
+                return true
+            }
+            await stateStore.setMultizoneStatus(
+                updateMultizoneStatus(
+                    current: await stateStore.multizoneStatus(),
+                    removingMemberID: deviceID
+                )
+            )
+            return true
+
+        case (.multizone, CastMultizoneMessageType.castingGroups.rawValue):
+            let response = try CastMessageJSONCodec.decodePayload(CastWire.Multizone.CastingGroupsResponse.self, from: message)
+            await stateStore.setMultizoneStatus(
+                updateMultizoneStatus(
+                    current: await stateStore.multizoneStatus(),
+                    replacingCastingGroupsWith: response.groups ?? response.status?.groups ?? []
+                )
+            )
+            return true
+
         default:
             return false
         }
@@ -59,6 +106,66 @@ actor CastStatusMessageProcessor {
         }
         return type
     }
+}
+
+private func updateMultizoneStatus(
+    current: CastMultizoneStatus?,
+    replacingMembersWith members: [CastWire.Multizone.Device]
+) -> CastMultizoneStatus {
+    CastMultizoneStatus(
+        members: members.compactMap(mapMultizoneMember(_:)),
+        castingGroups: current?.castingGroups ?? [],
+        lastUpdated: Date()
+    )
+}
+
+private func updateMultizoneStatus(
+    current: CastMultizoneStatus?,
+    upsertingMember member: CastWire.Multizone.Device
+) -> CastMultizoneStatus {
+    let mapped = mapMultizoneMember(member)
+    var members = current?.members ?? []
+
+    if let mapped {
+        if let index = members.firstIndex(where: { $0.id == mapped.id }) {
+            members[index] = mapped
+        } else {
+            members.append(mapped)
+        }
+        members.sort { lhs, rhs in
+            lhs.name.localizedCaseInsensitiveCompare(rhs.name) == .orderedAscending
+        }
+    }
+
+    return CastMultizoneStatus(
+        members: members,
+        castingGroups: current?.castingGroups ?? [],
+        lastUpdated: Date()
+    )
+}
+
+private func updateMultizoneStatus(
+    current: CastMultizoneStatus?,
+    removingMemberID memberID: CastDeviceID
+) -> CastMultizoneStatus {
+    let members = (current?.members ?? []).filter { $0.id != memberID }
+    return CastMultizoneStatus(
+        members: members,
+        castingGroups: current?.castingGroups ?? [],
+        lastUpdated: Date()
+    )
+}
+
+private func updateMultizoneStatus(
+    current: CastMultizoneStatus?,
+    replacingCastingGroupsWith groups: [CastWire.Multizone.CastingGroupsResponse.Group]
+) -> CastMultizoneStatus {
+    let mappedGroups = groups.compactMap(mapCastingGroup(_:))
+    return CastMultizoneStatus(
+        members: current?.members ?? [],
+        castingGroups: mappedGroups,
+        lastUpdated: Date()
+    )
 }
 
 private func mapReceiverStatus(_ status: CastWire.Receiver.Status) -> CastReceiverStatus? {
@@ -83,6 +190,25 @@ private func mapReceiverStatus(_ status: CastWire.Receiver.Status) -> CastReceiv
         isStandBy: status.isStandBy,
         isActiveInput: status.isActiveInput
     )
+}
+
+private func mapMultizoneMember(_ device: CastWire.Multizone.Device) -> CastMultizoneMember? {
+    let name = device.name?.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard let name, name.isEmpty == false else {
+        return nil
+    }
+    return .init(id: device.deviceId, name: name)
+}
+
+private func mapCastingGroup(_ group: CastWire.Multizone.CastingGroupsResponse.Group) -> CastCastingGroup? {
+    guard let id = group.deviceId else {
+        return nil
+    }
+    let name = group.name?.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard let name, name.isEmpty == false else {
+        return nil
+    }
+    return .init(id: id, name: name)
 }
 
 private func mapMediaStatus(_ status: CastWire.Media.Status) -> CastMediaStatus {

@@ -193,6 +193,30 @@ struct CastControllersTests {
         }
     }
 
+    @Test("multizone controller sends group status and casting group requests")
+    func multizoneControllerCommands() async throws {
+        let transport = RecordingCommandTransport()
+        let dispatcher = CastCommandDispatcher(transport: transport)
+        let stateStore = CastSessionStateStore()
+        let multizone = CastMultizoneController(dispatcher: dispatcher, stateStore: stateStore)
+
+        let req1 = try await multizone.getStatus()
+        let req2 = try await multizone.getCastingGroups()
+
+        #expect(req1 == 1)
+        #expect(req2 == 2)
+
+        let commands = await transport.commands()
+        #expect(commands.count == 2)
+        #expect(commands[0].route.namespace == .multizone)
+        #expect(commands[0].route.destinationID == "receiver-0")
+        #expect(commands[1].route.namespace == .multizone)
+
+        let jsons = try commands.map { try decodeJSON($0.payloadUTF8) }
+        #expect(jsons[0]["type"] == .string("GET_STATUS"))
+        #expect(jsons[1]["type"] == .string("GET_CASTING_GROUPS"))
+    }
+
     private func decodeJSON(_ payloadUTF8: String) throws -> [String: JSONValue] {
         try JSONDecoder().decode([String: JSONValue].self, from: Data(payloadUTF8.utf8))
     }

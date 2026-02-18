@@ -58,13 +58,16 @@ public extension CastSession {
     struct StateSnapshot: Sendable, Hashable {
         public let receiverStatus: CastReceiverStatus?
         public let mediaStatus: CastMediaStatus?
+        public let multizoneStatus: CastMultizoneStatus?
 
         public init(
             receiverStatus: CastReceiverStatus? = nil,
-            mediaStatus: CastMediaStatus? = nil
+            mediaStatus: CastMediaStatus? = nil,
+            multizoneStatus: CastMultizoneStatus? = nil
         ) {
             self.receiverStatus = receiverStatus
             self.mediaStatus = mediaStatus
+            self.multizoneStatus = multizoneStatus
         }
     }
 
@@ -72,6 +75,7 @@ public extension CastSession {
     enum StateEvent: Sendable, Hashable {
         case receiverStatusUpdated(CastReceiverStatus?)
         case mediaStatusUpdated(CastMediaStatus?)
+        case multizoneStatusUpdated(CastMultizoneStatus?)
     }
 
     /// Destination for a custom namespace message.
@@ -227,7 +231,7 @@ extension CastConnectionEvent {
 
 extension CastSessionStateSnapshot {
     var publicValue: CastSession.StateSnapshot {
-        .init(receiverStatus: receiverStatus, mediaStatus: mediaStatus)
+        .init(receiverStatus: receiverStatus, mediaStatus: mediaStatus, multizoneStatus: multizoneStatus)
     }
 }
 
@@ -236,6 +240,7 @@ extension CastSessionStateEvent {
         switch self {
         case let .receiverStatusUpdated(status): .receiverStatusUpdated(status)
         case let .mediaStatusUpdated(status): .mediaStatusUpdated(status)
+        case let .multizoneStatusUpdated(status): .multizoneStatusUpdated(status)
         }
     }
 }

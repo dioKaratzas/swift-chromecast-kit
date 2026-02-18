@@ -94,3 +94,15 @@ enum CastReceiverMessageType: String, Sendable, Hashable, Codable {
     case setVolume = "SET_VOLUME"
     case getAppAvailability = "GET_APP_AVAILABILITY"
 }
+
+/// Common Cast multizone protocol message types for speaker group membership and status.
+enum CastMultizoneMessageType: String, Sendable, Hashable, Codable {
+    case getStatus = "GET_STATUS"
+    case getCastingGroups = "GET_CASTING_GROUPS"
+    case multizoneStatus = "MULTIZONE_STATUS"
+    case castingGroups = "CASTING_GROUPS"
+    case deviceAdded = "DEVICE_ADDED"
+    case deviceUpdated = "DEVICE_UPDATED"
+    case deviceRemoved = "DEVICE_REMOVED"
+    case playbackSessionUpdated = "PLAYBACK_SESSION_UPDATED"
+}

@@ -9,6 +9,7 @@ import Foundation
 actor CastSessionStateStore {
     private var receiverStatusValue: CastReceiverStatus?
     private var mediaStatusValue: CastMediaStatus?
+    private var multizoneStatusValue: CastMultizoneStatus?
     private var eventContinuations = [UUID: AsyncStream<CastSessionStateEvent>.Continuation]()
 
     init() {}
@@ -23,9 +24,18 @@ actor CastSessionStateStore {
         mediaStatusValue
     }
 
+    /// Returns the latest multizone/group status snapshot.
+    func multizoneStatus() -> CastMultizoneStatus? {
+        multizoneStatusValue
+    }
+
     /// Returns a combined state snapshot.
     func snapshot() -> CastSessionStateSnapshot {
-        .init(receiverStatus: receiverStatusValue, mediaStatus: mediaStatusValue)
+        .init(
+            receiverStatus: receiverStatusValue,
+            mediaStatus: mediaStatusValue,
+            multizoneStatus: multizoneStatusValue
+        )
     }
 
     /// Subscribes to state updates for this session.
@@ -48,6 +58,11 @@ actor CastSessionStateStore {
     func setMediaStatus(_ status: CastMediaStatus?) {
         mediaStatusValue = status
         emit(.mediaStatusUpdated(status))
+    }
+
+    func setMultizoneStatus(_ status: CastMultizoneStatus?) {
+        multizoneStatusValue = status
+        emit(.multizoneStatusUpdated(status))
     }
 
     private func emit(_ event: CastSessionStateEvent) {
