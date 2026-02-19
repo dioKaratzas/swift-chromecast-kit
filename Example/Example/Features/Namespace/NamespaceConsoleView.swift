@@ -13,6 +13,7 @@ struct NamespaceConsoleView: View {
             Form {
                 Section("Send Custom Namespace Message") {
                     TextField("Namespace", text: $model.namespaceFilterString)
+                        .textFieldStyle(.roundedBorder)
 
                     Picker("Target", selection: $model.namespaceTargetChoice) {
                         ForEach(ShowcaseAppModel.NamespaceTargetChoice.allCases) { choice in
@@ -23,6 +24,7 @@ struct NamespaceConsoleView: View {
 
                     if model.namespaceTargetChoice == .transport {
                         TextField("Transport ID", text: $model.namespaceTransportTargetID)
+                            .textFieldStyle(.roundedBorder)
                     }
 
                     VStack(alignment: .leading, spacing: 6) {

@@ -37,6 +37,23 @@ struct DiscoverySidebarView: View {
                 }
             }
 
+            Section("Manual Host (Fallback)") {
+                TextField("Host or IP", text: $model.manualHostAddress)
+                    .autocorrectionDisabled()
+                    .textFieldStyle(.roundedBorder)
+
+                TextField("Port", text: $model.manualHostPortText)
+                    .textFieldStyle(.roundedBorder)
+
+                TextField("Friendly Name (optional)", text: $model.manualHostFriendlyName)
+                    .textFieldStyle(.roundedBorder)
+
+                Button("Add Manual Host") {
+                    model.addManualHostButtonTapped()
+                }
+                .help("Add a known Chromecast host when Bonjour discovery is blocked on the network")
+            }
+
             Section("Connection") {
                 LabeledContent("Session") {
                     ConnectionStatePill(state: model.sessionConnectionState)

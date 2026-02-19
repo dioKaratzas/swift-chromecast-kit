@@ -178,6 +178,11 @@ final class ShowcaseAppModel {
     var namespacePayloadText = "{\n  \"type\": \"PING\",\n  \"hello\": \"world\"\n}"
     var namespaceReplyText = ""
 
+    // Manual host fallback (when mDNS is unavailable)
+    var manualHostAddress = ""
+    var manualHostPortText = "8009"
+    var manualHostFriendlyName = ""
+
     init(discovery: CastDiscovery = CastDiscovery()) {
         self.discovery = discovery
     }
@@ -235,6 +240,10 @@ final class ShowcaseAppModel {
         Task { await clearDiscoveryDevices() }
     }
 
+    func addManualHostButtonTapped() {
+        Task { await addManualHost() }
+    }
+
     func selectedDeviceChanged(_ deviceID: CastDeviceID?) {
         selectedDeviceID = deviceID
     }
@@ -289,6 +298,30 @@ final class ShowcaseAppModel {
         await discovery.clearDevices()
         await refreshDiscoverySnapshot()
         appendDiscoveryLog("Cleared discovery snapshot")
+    }
+
+    private func addManualHost() async {
+        let host = manualHostAddress.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard host.isEmpty == false else {
+            latestUserError = "Enter a host/IP address."
+            return
+        }
+
+        let port = Int(manualHostPortText) ?? 8009
+        guard (1 ... 65535).contains(port) else {
+            latestUserError = "Port must be between 1 and 65535."
+            return
+        }
+
+        let friendlyName = manualHostFriendlyName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let descriptor = await discovery.addKnownHost(
+            host: host,
+            port: port,
+            friendlyName: friendlyName.isEmpty ? nil : friendlyName
+        )
+        await refreshDiscoverySnapshot()
+        selectedDeviceID = descriptor.id
+        appendDiscoveryLog("Added manual host: \(descriptor.friendlyName) @ \(descriptor.host):\(descriptor.port)")
     }
 
     private func handleDiscoveryEvent(_ event: CastDiscoveryEvent) async {

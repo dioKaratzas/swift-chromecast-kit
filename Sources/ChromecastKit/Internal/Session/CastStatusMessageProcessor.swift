@@ -51,7 +51,7 @@ actor CastStatusMessageProcessor {
             let response = try CastMessageJSONCodec.decodePayload(CastWire.Multizone.StatusResponse.self, from: message)
             await stateStore.setMultizoneStatus(
                 updateMultizoneStatus(
-                    current: await stateStore.multizoneStatus(),
+                    current: stateStore.multizoneStatus(),
                     replacingMembersWith: response.status.devices ?? []
                 )
             )
@@ -59,36 +59,45 @@ actor CastStatusMessageProcessor {
 
         case (.multizone, CastMultizoneMessageType.deviceAdded.rawValue),
              (.multizone, CastMultizoneMessageType.deviceUpdated.rawValue):
-            let response = try CastMessageJSONCodec.decodePayload(CastWire.Multizone.DeviceDeltaResponse.self, from: message)
+            let response = try CastMessageJSONCodec.decodePayload(
+                CastWire.Multizone.DeviceDeltaResponse.self,
+                from: message
+            )
             guard let device = response.device else {
                 return true
             }
             await stateStore.setMultizoneStatus(
                 updateMultizoneStatus(
-                    current: await stateStore.multizoneStatus(),
+                    current: stateStore.multizoneStatus(),
                     upsertingMember: device
                 )
             )
             return true
 
         case (.multizone, CastMultizoneMessageType.deviceRemoved.rawValue):
-            let response = try CastMessageJSONCodec.decodePayload(CastWire.Multizone.DeviceDeltaResponse.self, from: message)
+            let response = try CastMessageJSONCodec.decodePayload(
+                CastWire.Multizone.DeviceDeltaResponse.self,
+                from: message
+            )
             guard let deviceID = response.deviceId else {
                 return true
             }
             await stateStore.setMultizoneStatus(
                 updateMultizoneStatus(
-                    current: await stateStore.multizoneStatus(),
+                    current: stateStore.multizoneStatus(),
                     removingMemberID: deviceID
                 )
             )
             return true
 
         case (.multizone, CastMultizoneMessageType.castingGroups.rawValue):
-            let response = try CastMessageJSONCodec.decodePayload(CastWire.Multizone.CastingGroupsResponse.self, from: message)
+            let response = try CastMessageJSONCodec.decodePayload(
+                CastWire.Multizone.CastingGroupsResponse.self,
+                from: message
+            )
             await stateStore.setMultizoneStatus(
                 updateMultizoneStatus(
-                    current: await stateStore.multizoneStatus(),
+                    current: stateStore.multizoneStatus(),
                     replacingCastingGroupsWith: response.groups ?? response.status?.groups ?? []
                 )
             )

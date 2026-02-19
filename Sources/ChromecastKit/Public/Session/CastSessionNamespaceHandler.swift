@@ -27,5 +27,7 @@ public protocol CastSessionNamespaceHandler: Sendable {
 }
 
 public extension CastSessionNamespaceHandler {
-    var namespace: CastNamespace? { nil }
+    var namespace: CastNamespace? {
+        nil
+    }
 }

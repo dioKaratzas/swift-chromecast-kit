@@ -30,23 +30,28 @@ struct MediaPlaygroundView: View {
             }
 
             Section("Media Source") {
-                TextField("Media URL", text: $model.mediaURLString)
-                TextField("Content Type", text: $model.mediaContentType)
-                TextField("Title", text: $model.mediaTitle)
-                TextField("Subtitle", text: $model.mediaSubtitle)
-                TextField("Cover Image URL (optional)", text: $model.mediaCoverURLString)
+                TextField("Media URL", text: $model.mediaURLString).textFieldStyle(.roundedBorder)
+                TextField("Content Type", text: $model.mediaContentType).textFieldStyle(.roundedBorder)
+                TextField("Title", text: $model.mediaTitle).textFieldStyle(.roundedBorder)
+                TextField("Subtitle", text: $model.mediaSubtitle).textFieldStyle(.roundedBorder)
+                TextField("Cover Image URL (optional)", text: $model.mediaCoverURLString).textFieldStyle(.roundedBorder)
 
                 Toggle("Autoplay", isOn: $model.mediaAutoplay)
                 TextField("Start Time (seconds, optional)", text: $model.mediaStartTimeText)
+                    .textFieldStyle(.roundedBorder)
             }
 
             Section("Subtitles (VTT)") {
                 TextField("Subtitle URL (.vtt)", text: $model.mediaSubtitleURLString)
+                    .textFieldStyle(.roundedBorder)
                 HStack {
                     TextField("Track ID", text: $model.mediaSubtitleTrackIDText)
+                        .textFieldStyle(.roundedBorder)
                         .frame(width: 100)
                     TextField("Name", text: $model.mediaSubtitleName)
+                        .textFieldStyle(.roundedBorder)
                     TextField("Language", text: $model.mediaSubtitleLanguageCode)
+                        .textFieldStyle(.roundedBorder)
                         .frame(width: 120)
                 }
                 Picker("Style Preset", selection: $model.subtitleStylePreset) {
@@ -74,10 +79,12 @@ struct MediaPlaygroundView: View {
 
                 HStack {
                     TextField("Seek Seconds", text: $model.mediaSeekSecondsText)
+                        .textFieldStyle(.roundedBorder)
                         .frame(width: 140)
                     Button("Seek") { model.mediaSeekButtonTapped() }
                     Spacer()
                     TextField("Playback Rate", text: $model.mediaPlaybackRateText)
+                        .textFieldStyle(.roundedBorder)
                         .frame(width: 120)
                     Button("Apply Rate") { model.mediaSetPlaybackRateButtonTapped() }
                 }
