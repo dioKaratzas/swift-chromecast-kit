@@ -118,6 +118,70 @@ struct CastSessionPublicAPITests {
         await session.disconnect(reason: .requested)
     }
 
+    @Test("namespace handler registry routes filtered custom events")
+    func namespaceHandlerRegistry() async throws {
+        let transport = PublicSessionTestTransport()
+        let runtime = CastSessionRuntime(
+            device: .init(id: "device-1", friendlyName: "Living Room", host: "192.168.1.10"),
+            transport: transport,
+            configuration: .init(heartbeatInterval: 0, autoReconnect: false)
+        )
+        let session = CastSession(runtime: runtime)
+        let handler = RecordingNamespaceHandler(namespace: "urn:x-cast:com.example.echo")
+
+        try await session.connect()
+        let token = await session.registerNamespaceHandler(handler)
+
+        await transport.emitInboundEvent(
+            .utf8(
+                .init(
+                    route: .init(
+                        sourceID: "web-42",
+                        destinationID: "sender-0",
+                        namespace: "urn:x-cast:com.example.echo"
+                    ),
+                    payloadUTF8: #"{"type":"PING"}"#
+                )
+            )
+        )
+        await transport.emitInboundEvent(
+            .utf8(
+                .init(
+                    route: .init(
+                        sourceID: "web-42",
+                        destinationID: "sender-0",
+                        namespace: "urn:x-cast:com.example.other"
+                    ),
+                    payloadUTF8: #"{"type":"IGNORE"}"#
+                )
+            )
+        )
+
+        let handled = try #require(await waitForHandledCount(on: handler, count: 1))
+        #expect(handled == 1)
+        let events = await handler.events()
+        #expect(events.count == 1)
+        #expect(events.first?.namespace == "urn:x-cast:com.example.echo")
+
+        await session.unregisterNamespaceHandler(token)
+        await transport.emitInboundEvent(
+            .utf8(
+                .init(
+                    route: .init(
+                        sourceID: "web-42",
+                        destinationID: "sender-0",
+                        namespace: "urn:x-cast:com.example.echo"
+                    ),
+                    payloadUTF8: #"{"type":"PING2"}"#
+                )
+            )
+        )
+
+        try? await Task.sleep(nanoseconds: 50_000_000)
+        #expect(await handler.events().count == 1)
+        await session.disconnect(reason: .requested)
+    }
+
     private func waitForCommand(
         on transport: PublicSessionTestTransport,
         requestID: CastRequestID,
@@ -139,6 +203,39 @@ struct CastSessionPublicAPITests {
             return nil
         }
         return Int(number)
+    }
+
+    private func waitForHandledCount(
+        on handler: RecordingNamespaceHandler,
+        count: Int,
+        timeout: TimeInterval = 0.5
+    ) async -> Int? {
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            let current = await handler.events().count
+            if current >= count {
+                return current
+            }
+            try? await Task.sleep(nanoseconds: 1_000_000)
+        }
+        return await handler.events().count
+    }
+}
+
+private actor RecordingNamespaceHandler: CastSessionNamespaceHandler {
+    let namespace: CastNamespace?
+    private var handledEvents = [CastSession.NamespaceEvent]()
+
+    init(namespace: CastNamespace?) {
+        self.namespace = namespace
+    }
+
+    func handle(event: CastSession.NamespaceEvent, in _: CastSession) async {
+        handledEvents.append(event)
+    }
+
+    func events() -> [CastSession.NamespaceEvent] {
+        handledEvents
     }
 }
 

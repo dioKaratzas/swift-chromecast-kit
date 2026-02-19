@@ -17,6 +17,8 @@ public actor CastSession {
     public nonisolated let multizone: CastMultizoneController
 
     private let runtime: CastSessionRuntime
+    private var namespaceHandlers = [CastSessionNamespaceHandlerToken: any CastSessionNamespaceHandler]()
+    private var namespaceHandlerFanoutTask: Task<Void, Never>?
 
     /// Creates a Cast session for a discovered device using the built-in Cast v2 TLS transport.
     public init(
@@ -188,6 +190,69 @@ public actor CastSession {
     public func namespaceEvents(_ namespace: CastNamespace? = nil) async -> AsyncStream<NamespaceEvent> {
         let coreStream = await runtime.namespaceEvents(namespace: namespace)
         return mapStream(coreStream) { $0.publicNamespaceEvent }
+    }
+
+    /// Registers a custom namespace event handler.
+    ///
+    /// Handlers are invoked for inbound custom namespace events while the session is alive.
+    /// Use `unregisterNamespaceHandler(_:)` to remove a handler later.
+    @discardableResult
+    public func registerNamespaceHandler(
+        _ handler: any CastSessionNamespaceHandler
+    ) -> CastSessionNamespaceHandlerToken {
+        let token = CastSessionNamespaceHandlerToken(rawValue: UUID())
+        namespaceHandlers[token] = handler
+        startNamespaceHandlerFanoutIfNeeded()
+        return token
+    }
+
+    /// Unregisters a previously registered custom namespace event handler.
+    public func unregisterNamespaceHandler(_ token: CastSessionNamespaceHandlerToken) {
+        namespaceHandlers[token] = nil
+        stopNamespaceHandlerFanoutIfNeeded()
+    }
+
+    /// Removes all registered custom namespace handlers.
+    public func removeAllNamespaceHandlers() {
+        namespaceHandlers.removeAll(keepingCapacity: false)
+        stopNamespaceHandlerFanoutIfNeeded(force: true)
+    }
+
+    private func startNamespaceHandlerFanoutIfNeeded() {
+        guard namespaceHandlerFanoutTask == nil, namespaceHandlers.isEmpty == false else {
+            return
+        }
+
+        let runtime = self.runtime
+        let session = self
+        namespaceHandlerFanoutTask = Task {
+            let stream = await runtime.namespaceEvents()
+            for await coreEvent in stream {
+                await session.dispatchNamespaceHandlerEvent(coreEvent.publicNamespaceEvent)
+            }
+        }
+    }
+
+    private func stopNamespaceHandlerFanoutIfNeeded(force: Bool = false) {
+        guard force || namespaceHandlers.isEmpty else {
+            return
+        }
+        namespaceHandlerFanoutTask?.cancel()
+        namespaceHandlerFanoutTask = nil
+    }
+
+    private func dispatchNamespaceHandlerEvent(_ event: NamespaceEvent) async {
+        guard namespaceHandlers.isEmpty == false else {
+            return
+        }
+
+        let handlers = Array(namespaceHandlers.values)
+        for handler in handlers {
+            guard handler.namespace == nil || handler.namespace == event.namespace else {
+                continue
+            }
+            await handler.handle(event: event, in: self)
+        }
     }
 }
 

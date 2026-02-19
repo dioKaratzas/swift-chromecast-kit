@@ -92,6 +92,53 @@ struct SessionDashboardView: View {
                 }
             }
 
+            Section("Multizone / Groups") {
+                HStack {
+                    Button("Get Multizone Status") {
+                        model.multizoneGetStatusButtonTapped()
+                    }
+                    .disabled(model.session == nil)
+
+                    Button("Get Casting Groups") {
+                        model.multizoneGetCastingGroupsButtonTapped()
+                    }
+                    .disabled(model.session == nil)
+                }
+
+                if let multizone = model.sessionSnapshot.multizoneStatus {
+                    LabeledContent("Members") {
+                        Text("\(multizone.members.count)")
+                    }
+                    if multizone.members.isEmpty == false {
+                        ForEach(multizone.members) { member in
+                            LabeledContent(member.name) {
+                                Text(member.id.rawValue)
+                                    .font(.caption.monospaced())
+                                    .foregroundStyle(.secondary)
+                                    .textSelection(.enabled)
+                            }
+                        }
+                    }
+
+                    LabeledContent("Casting Groups") {
+                        Text("\(multizone.castingGroups.count)")
+                    }
+                    if multizone.castingGroups.isEmpty == false {
+                        ForEach(multizone.castingGroups) { group in
+                            LabeledContent(group.name) {
+                                Text(group.id.rawValue)
+                                    .font(.caption.monospaced())
+                                    .foregroundStyle(.secondary)
+                                    .textSelection(.enabled)
+                            }
+                        }
+                    }
+                } else {
+                    Text("No multizone status yet. Useful for speaker groups and multizone-capable audio devices.")
+                        .foregroundStyle(.secondary)
+                }
+            }
+
             if model.showsNetflixCapabilityNote {
                 Section("Netflix / App-Specific Protocol Note") {
                     Text(

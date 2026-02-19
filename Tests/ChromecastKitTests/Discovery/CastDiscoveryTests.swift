@@ -196,6 +196,27 @@ struct CastDiscoveryTests {
             try await discovery.waitForDevice(id: "missing-device", timeout: 0.01)
         }
     }
+
+    @Test("manual known-host helpers upsert and remove snapshot devices")
+    func manualKnownHostHelpers() async {
+        let browser = RecordingDiscoveryBrowser()
+        let discovery = CastDiscovery(browser: browser)
+        var events = await discovery.events().makeAsyncIterator()
+
+        let manual = await discovery.addKnownHost(
+            host: "192.168.1.55",
+            friendlyName: "Office Speaker",
+            capabilities: [.audio, .multizone]
+        )
+        #expect(manual.id == "manual:192.168.1.55:8009")
+        #expect(await discovery.device(id: manual.id) == manual)
+
+        await discovery.removeKnownDevice(id: manual.id)
+        #expect(await discovery.device(id: manual.id) == nil)
+
+        #expect(await events.next() == .deviceUpserted(device: manual, isNew: true))
+        #expect(await events.next() == .deviceRemoved(id: manual.id))
+    }
 }
 
 private actor RecordingDiscoveryBrowser: CastDiscoveryBrowser {

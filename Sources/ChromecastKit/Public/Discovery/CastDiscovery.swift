@@ -185,6 +185,46 @@ public actor CastDiscovery {
         devicesByID.removeAll()
     }
 
+    /// Adds or updates a known Cast device descriptor in the discovery snapshot.
+    ///
+    /// This is useful when discovery is restricted on the current network but a device host is known.
+    public func addKnownDevice(_ device: CastDeviceDescriptor) {
+        upsertDiscoveredDevice(device)
+    }
+
+    /// Adds or updates a known Cast host in the discovery snapshot and returns the descriptor.
+    ///
+    /// The default identifier is stable for the provided `host`/`port` pair.
+    @discardableResult
+    public func addKnownHost(
+        host: String,
+        port: Int = 8009,
+        id: CastDeviceID? = nil,
+        friendlyName: String? = nil,
+        modelName: String? = nil,
+        manufacturer: String? = nil,
+        uuid: UUID? = nil,
+        capabilities: Set<CastDeviceCapability> = []
+    ) -> CastDeviceDescriptor {
+        let descriptor = CastDeviceDescriptor(
+            id: id ?? CastDeviceID("manual:\(host):\(port)"),
+            friendlyName: friendlyName ?? host,
+            host: host,
+            port: port,
+            modelName: modelName,
+            manufacturer: manufacturer,
+            uuid: uuid,
+            capabilities: capabilities
+        )
+        upsertDiscoveredDevice(descriptor)
+        return descriptor
+    }
+
+    /// Removes a manually added or discovered device from the current snapshot.
+    public func removeKnownDevice(id: CastDeviceID) {
+        removeDiscoveredDevice(id: id)
+    }
+
     /// Applies or updates a discovered device descriptor.
     ///
     /// This method is `internal` for the eventual mDNS browser integration.

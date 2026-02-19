@@ -565,7 +565,8 @@ final class ShowcaseAppModel {
                 if self.sessionSnapshot.mediaStatus?.isPlaying == true {
                     self.sessionSnapshot = .init(
                         receiverStatus: self.sessionSnapshot.receiverStatus,
-                        mediaStatus: self.sessionSnapshot.mediaStatus
+                        mediaStatus: self.sessionSnapshot.mediaStatus,
+                        multizoneStatus: self.sessionSnapshot.multizoneStatus
                     )
                 }
             }
@@ -592,6 +593,14 @@ final class ShowcaseAppModel {
 
     func receiverSetMutedButtonTapped() {
         Task { await receiverSetMuted() }
+    }
+
+    func multizoneGetStatusButtonTapped() {
+        Task { await multizoneGetStatus() }
+    }
+
+    func multizoneGetCastingGroupsButtonTapped() {
+        Task { await multizoneGetCastingGroups() }
     }
 
     private func receiverGetStatus() async {
@@ -625,6 +634,18 @@ final class ShowcaseAppModel {
         let muted = receiverMuted
         await runSessionAction(muted ? "Mute receiver" : "Unmute receiver") { session in
             _ = try await session.receiver.setMuted(muted)
+        }
+    }
+
+    private func multizoneGetStatus() async {
+        await runSessionAction("Multizone GET_STATUS") { session in
+            _ = try await session.multizone.getStatus()
+        }
+    }
+
+    private func multizoneGetCastingGroups() async {
+        await runSessionAction("Multizone GET_CASTING_GROUPS") { session in
+            _ = try await session.multizone.getCastingGroups()
         }
     }
 
