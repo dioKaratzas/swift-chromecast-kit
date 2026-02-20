@@ -9,13 +9,16 @@ import Foundation
 public struct CastDiscoveryConfiguration: Sendable, Hashable {
     public var includeGroups: Bool
     public var browseTimeout: TimeInterval?
+    public var enableSSDPFallback: Bool
 
     public init(
         includeGroups: Bool = true,
-        browseTimeout: TimeInterval? = nil
+        browseTimeout: TimeInterval? = nil,
+        enableSSDPFallback: Bool = false
     ) {
         self.includeGroups = includeGroups
         self.browseTimeout = browseTimeout
+        self.enableSSDPFallback = enableSSDPFallback
     }
 }
 

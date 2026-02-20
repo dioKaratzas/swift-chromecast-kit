@@ -1,0 +1,200 @@
+//
+//  ChromecastKit
+//  Swift package for Google Cast (Chromecast).
+//
+
+@preconcurrency import Network
+import Dispatch
+import Foundation
+
+/// Best-effort SSDP/DIAL fallback discovery backend.
+///
+/// This is primarily useful on networks where Bonjour/mDNS browsing is restricted.
+/// It sends DIAL SSDP `M-SEARCH` queries and fetches device-description XML from `LOCATION`.
+actor SSDPCastDiscoveryBrowser: CastDiscoveryBrowser {
+    private let callbackQueue = DispatchQueue(label: "ChromecastKit.Discovery.SSDP")
+
+    private var configuration = CastDiscoveryConfiguration()
+    private var connection: NWConnection?
+    private var isRunning = false
+    private var eventContinuations = [UUID: AsyncStream<CastDiscoveryBrowserEvent>.Continuation]()
+    private var pollTask: Task<Void, Never>?
+    private var knownByLocation = [URL: CastDeviceID]()
+    private var detailFetchTasks = [URL: Task<Void, Never>]()
+
+    func events() async -> AsyncStream<CastDiscoveryBrowserEvent> {
+        let id = UUID()
+        return AsyncStream { continuation in
+            eventContinuations[id] = continuation
+            continuation.onTermination = { [id] _ in
+                Task { await self.removeContinuation(id: id) }
+            }
+        }
+    }
+
+    func start(configuration: CastDiscoveryConfiguration) async throws {
+        guard isRunning == false else { return }
+        isRunning = true
+        self.configuration = configuration
+
+        let params = NWParameters.udp
+        params.includePeerToPeer = false
+        params.allowLocalEndpointReuse = true
+
+        let connection = NWConnection(
+            host: NWEndpoint.Host(CastSSDPDiscoveryParser.multicastHost),
+            port: NWEndpoint.Port(rawValue: UInt16(CastSSDPDiscoveryParser.multicastPort))!,
+            using: params
+        )
+        self.connection = connection
+
+        connection.stateUpdateHandler = { state in
+            switch state {
+            case .failed(let error):
+                Task { await self.emit(.error(.discoveryFailed("SSDP failed: \(error)"))) }
+            default:
+                break
+            }
+        }
+
+        connection.start(queue: callbackQueue)
+        startReceiveLoopIfNeeded()
+        startPollingLoopIfNeeded()
+
+        do {
+            try await sendSearchRequest()
+        } catch {
+            // keep backend alive; periodic retries may recover.
+            emit(.error(error as? CastError ?? .discoveryFailed(String(describing: error))))
+        }
+    }
+
+    func stop() async {
+        isRunning = false
+        pollTask?.cancel()
+        pollTask = nil
+        for task in detailFetchTasks.values { task.cancel() }
+        detailFetchTasks.removeAll(keepingCapacity: false)
+        connection?.cancel()
+        connection = nil
+        knownByLocation.removeAll(keepingCapacity: false)
+    }
+
+    private func startPollingLoopIfNeeded() {
+        guard pollTask == nil else { return }
+        pollTask = Task {
+            while Task.isCancelled == false {
+                do {
+                    try await Task.sleep(nanoseconds: 15_000_000_000)
+                } catch {
+                    return
+                }
+                guard !Task.isCancelled else { return }
+                do {
+                    try await self.sendSearchRequest()
+                } catch {
+                    self.emit(.error(error as? CastError ?? .discoveryFailed(String(describing: error))))
+                }
+            }
+        }
+    }
+
+    private func startReceiveLoopIfNeeded() {
+        guard let connection else { return }
+        connection.receiveMessage { data, _, _, error in
+            if let error {
+                Task { await self.emit(.error(.discoveryFailed("SSDP receive failed: \(error)"))) }
+            }
+            if let data, data.isEmpty == false {
+                Task { await self.handleDatagram(data) }
+            }
+            Task { await self.scheduleNextReceive() }
+        }
+    }
+
+    private func scheduleNextReceive() {
+        guard isRunning, connection != nil else { return }
+        startReceiveLoopIfNeeded()
+    }
+
+    private func sendSearchRequest() async throws {
+        guard let connection else { throw CastError.discoveryFailed("SSDP transport not started") }
+        let payload = Data(ssdpSearchRequest.utf8)
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, any Error>) in
+            connection.send(content: payload, completion: .contentProcessed { error in
+                if let error {
+                    continuation.resume(throwing: CastError.discoveryFailed("SSDP send failed: \(error)"))
+                } else {
+                    continuation.resume(returning: ())
+                }
+            })
+        }
+    }
+
+    private func handleDatagram(_ data: Data) async {
+        guard let response = CastSSDPDiscoveryParser.parseSearchResponse(data),
+              CastSSDPDiscoveryParser.isDialResponse(response)
+        else {
+            return
+        }
+
+        guard detailFetchTasks[response.locationURL] == nil else {
+            return
+        }
+
+        detailFetchTasks[response.locationURL] = Task {
+            defer { self.clearDetailFetchTask(for: response.locationURL) }
+            do {
+                let includeGroups = self.configuration.includeGroups
+                let (xmlData, _) = try await URLSession.shared.data(from: response.locationURL)
+                guard let description = CastSSDPDiscoveryParser.parseDIALDeviceDescription(xmlData),
+                      let descriptor = CastSSDPDiscoveryParser.makeDescriptor(
+                          from: response,
+                          description: description,
+                          includeGroups: includeGroups
+                      )
+                else {
+                    return
+                }
+                self.finishDescriptor(descriptor, locationURL: response.locationURL)
+            } catch is CancellationError {
+                return
+            } catch {
+                // Best effort fallback, ignore individual failures.
+            }
+        }
+    }
+
+    private func finishDescriptor(_ descriptor: CastDeviceDescriptor, locationURL: URL) {
+        knownByLocation[locationURL] = descriptor.id
+        emit(.deviceUpserted(descriptor))
+    }
+
+    private func clearDetailFetchTask(for locationURL: URL) {
+        detailFetchTasks[locationURL]?.cancel()
+        detailFetchTasks[locationURL] = nil
+    }
+
+    private var ssdpSearchRequest: String {
+        [
+            "M-SEARCH * HTTP/1.1",
+            "HOST: \(CastSSDPDiscoveryParser.multicastHost):\(CastSSDPDiscoveryParser.multicastPort)",
+            "MAN: \"ssdp:discover\"",
+            "MX: 1",
+            "ST: \(CastSSDPDiscoveryParser.dialSearchTarget)",
+            "USER-AGENT: ChromecastKit/1.0",
+            "",
+            "",
+        ].joined(separator: "\r\n")
+    }
+
+    private func emit(_ event: CastDiscoveryBrowserEvent) {
+        for continuation in eventContinuations.values {
+            continuation.yield(event)
+        }
+    }
+
+    private func removeContinuation(id: UUID) {
+        eventContinuations[id] = nil
+    }
+}

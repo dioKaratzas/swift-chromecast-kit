@@ -22,7 +22,7 @@ public actor CastDiscovery {
     private var activeBrowseRunID: UUID?
 
     public init(configuration: CastDiscoveryConfiguration = .init()) {
-        self.init(configuration: configuration, browser: NWDNSSDDiscoveryBrowser())
+        self.init(configuration: configuration, browser: CompositeCastDiscoveryBrowser())
     }
 
     init(
