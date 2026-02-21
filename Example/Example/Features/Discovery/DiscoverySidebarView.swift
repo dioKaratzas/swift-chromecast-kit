@@ -15,6 +15,10 @@ struct DiscoverySidebarView: View {
                 LabeledContent("State") {
                     DiscoveryStateLabel(state: model.discoveryState)
                 }
+                LabeledContent("Backends") {
+                    Text("mDNS + SSDP")
+                        .foregroundStyle(.secondary)
+                }
                 LabeledContent("Devices") {
                     Text(model.devices.count, format: .number)
                         .monospacedDigit()

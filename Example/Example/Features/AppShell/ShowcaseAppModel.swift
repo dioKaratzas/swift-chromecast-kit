@@ -183,7 +183,15 @@ final class ShowcaseAppModel {
     var manualHostPortText = "8009"
     var manualHostFriendlyName = ""
 
-    init(discovery: CastDiscovery = CastDiscovery()) {
+    init(
+        discovery: CastDiscovery = CastDiscovery(
+            configuration: .init(
+                includeGroups: true,
+                browseTimeout: nil,
+                enableSSDPFallback: true
+            )
+        )
+    ) {
         self.discovery = discovery
     }
 
