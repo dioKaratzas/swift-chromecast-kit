@@ -12,6 +12,15 @@ import Foundation
 /// This is primarily useful on networks where Bonjour/mDNS browsing is restricted.
 /// It sends DIAL SSDP `M-SEARCH` queries and fetches device-description XML from `LOCATION`.
 actor SSDPCastDiscoveryBrowser: CastDiscoveryBrowser {
+    // MARK: Models
+
+    private struct KnownLocationEntry: Sendable, Hashable {
+        var deviceID: CastDeviceID
+        var expiresAt: Date?
+    }
+
+    // MARK: State
+
     private let callbackQueue = DispatchQueue(label: "ChromecastKit.Discovery.SSDP")
 
     private var configuration = CastDiscoveryConfiguration()
@@ -19,8 +28,10 @@ actor SSDPCastDiscoveryBrowser: CastDiscoveryBrowser {
     private var isRunning = false
     private var eventContinuations = [UUID: AsyncStream<CastDiscoveryBrowserEvent>.Continuation]()
     private var pollTask: Task<Void, Never>?
-    private var knownByLocation = [URL: CastDeviceID]()
+    private var knownByLocation = [URL: KnownLocationEntry]()
     private var detailFetchTasks = [URL: Task<Void, Never>]()
+
+    // MARK: CastDiscoveryBrowser
 
     func events() async -> AsyncStream<CastDiscoveryBrowserEvent> {
         let id = UUID()
@@ -33,7 +44,9 @@ actor SSDPCastDiscoveryBrowser: CastDiscoveryBrowser {
     }
 
     func start(configuration: CastDiscoveryConfiguration) async throws {
-        guard isRunning == false else { return }
+        guard isRunning == false else {
+            return
+        }
         isRunning = true
         self.configuration = configuration
 
@@ -50,7 +63,7 @@ actor SSDPCastDiscoveryBrowser: CastDiscoveryBrowser {
 
         connection.stateUpdateHandler = { state in
             switch state {
-            case .failed(let error):
+            case let .failed(error):
                 Task { await self.emit(.error(.discoveryFailed("SSDP failed: \(error)"))) }
             default:
                 break
@@ -73,15 +86,21 @@ actor SSDPCastDiscoveryBrowser: CastDiscoveryBrowser {
         isRunning = false
         pollTask?.cancel()
         pollTask = nil
-        for task in detailFetchTasks.values { task.cancel() }
+        for task in detailFetchTasks.values {
+            task.cancel()
+        }
         detailFetchTasks.removeAll(keepingCapacity: false)
         connection?.cancel()
         connection = nil
         knownByLocation.removeAll(keepingCapacity: false)
     }
 
+    // MARK: Polling / Receive
+
     private func startPollingLoopIfNeeded() {
-        guard pollTask == nil else { return }
+        guard pollTask == nil else {
+            return
+        }
         pollTask = Task {
             while Task.isCancelled == false {
                 do {
@@ -89,8 +108,11 @@ actor SSDPCastDiscoveryBrowser: CastDiscoveryBrowser {
                 } catch {
                     return
                 }
-                guard !Task.isCancelled else { return }
+                guard !Task.isCancelled else {
+                    return
+                }
                 do {
+                    self.expireKnownLocationsIfNeeded()
                     try await self.sendSearchRequest()
                 } catch {
                     self.emit(.error(error as? CastError ?? .discoveryFailed(String(describing: error))))
@@ -100,7 +122,9 @@ actor SSDPCastDiscoveryBrowser: CastDiscoveryBrowser {
     }
 
     private func startReceiveLoopIfNeeded() {
-        guard let connection else { return }
+        guard let connection else {
+            return
+        }
         connection.receiveMessage { data, _, _, error in
             if let error {
                 Task { await self.emit(.error(.discoveryFailed("SSDP receive failed: \(error)"))) }
@@ -113,12 +137,18 @@ actor SSDPCastDiscoveryBrowser: CastDiscoveryBrowser {
     }
 
     private func scheduleNextReceive() {
-        guard isRunning, connection != nil else { return }
+        guard isRunning, connection != nil else {
+            return
+        }
         startReceiveLoopIfNeeded()
     }
 
+    // MARK: SSDP Requests
+
     private func sendSearchRequest() async throws {
-        guard let connection else { throw CastError.discoveryFailed("SSDP transport not started") }
+        guard let connection else {
+            throw CastError.discoveryFailed("SSDP transport not started")
+        }
         let payload = Data(ssdpSearchRequest.utf8)
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, any Error>) in
             connection.send(content: payload, completion: .contentProcessed { error in
@@ -131,10 +161,11 @@ actor SSDPCastDiscoveryBrowser: CastDiscoveryBrowser {
         }
     }
 
+    // MARK: Datagram Handling
+
     private func handleDatagram(_ data: Data) async {
         guard let response = CastSSDPDiscoveryParser.parseSearchResponse(data),
-              CastSSDPDiscoveryParser.isDialResponse(response)
-        else {
+              CastSSDPDiscoveryParser.isDialResponse(response) else {
             return
         }
 
@@ -152,11 +183,14 @@ actor SSDPCastDiscoveryBrowser: CastDiscoveryBrowser {
                           from: response,
                           description: description,
                           includeGroups: includeGroups
-                      )
-                else {
+                      ) else {
                     return
                 }
-                self.finishDescriptor(descriptor, locationURL: response.locationURL)
+                self.finishDescriptor(
+                    descriptor,
+                    locationURL: response.locationURL,
+                    cacheMaxAge: response.cacheMaxAge
+                )
             } catch is CancellationError {
                 return
             } catch {
@@ -165,15 +199,41 @@ actor SSDPCastDiscoveryBrowser: CastDiscoveryBrowser {
         }
     }
 
-    private func finishDescriptor(_ descriptor: CastDeviceDescriptor, locationURL: URL) {
-        knownByLocation[locationURL] = descriptor.id
+    private func finishDescriptor(
+        _ descriptor: CastDeviceDescriptor,
+        locationURL: URL,
+        cacheMaxAge: TimeInterval?
+    ) {
+        let expiresAt = cacheMaxAge.map { Date().addingTimeInterval($0) }
+        knownByLocation[locationURL] = .init(deviceID: descriptor.id, expiresAt: expiresAt)
         emit(.deviceUpserted(descriptor))
     }
+
+    // MARK: Expiry / Task Cleanup
 
     private func clearDetailFetchTask(for locationURL: URL) {
         detailFetchTasks[locationURL]?.cancel()
         detailFetchTasks[locationURL] = nil
     }
+
+    private func expireKnownLocationsIfNeeded(now: Date = .init()) {
+        var expiredLocations = [URL]()
+        for (locationURL, entry) in knownByLocation {
+            guard let expiresAt = entry.expiresAt, expiresAt <= now else {
+                continue
+            }
+            expiredLocations.append(locationURL)
+        }
+
+        for locationURL in expiredLocations {
+            guard let entry = knownByLocation.removeValue(forKey: locationURL) else {
+                continue
+            }
+            emit(.deviceRemoved(entry.deviceID))
+        }
+    }
+
+    // MARK: Message Construction
 
     private var ssdpSearchRequest: String {
         [
@@ -187,6 +247,8 @@ actor SSDPCastDiscoveryBrowser: CastDiscoveryBrowser {
             "",
         ].joined(separator: "\r\n")
     }
+
+    // MARK: Event Fanout
 
     private func emit(_ event: CastDiscoveryBrowserEvent) {
         for continuation in eventContinuations.values {

@@ -12,36 +12,38 @@ struct CastSSDPDiscoveryParserTests {
     @Test("parses DIAL SSDP search response headers")
     func parseSearchResponse() throws {
         let data = Data(#"""
-HTTP/1.1 200 OK
-CACHE-CONTROL: max-age=1800
-LOCATION: http://192.168.1.25:8008/ssdp/device-desc.xml
-ST: urn:dial-multiscreen-org:service:dial:1
-USN: uuid:12345678-1234-1234-1234-1234567890AB::urn:dial-multiscreen-org:service:dial:1
+        HTTP/1.1 200 OK
+        CACHE-CONTROL: max-age=1800
+        LOCATION: http://192.168.1.25:8008/ssdp/device-desc.xml
+        ST: urn:dial-multiscreen-org:service:dial:1
+        USN: uuid:12345678-1234-1234-1234-1234567890AB::urn:dial-multiscreen-org:service:dial:1
 
-"""#.utf8)
+        """#.utf8)
 
         let response = try #require(CastSSDPDiscoveryParser.parseSearchResponse(data))
         #expect(response.locationURL.absoluteString == "http://192.168.1.25:8008/ssdp/device-desc.xml")
         #expect(CastSSDPDiscoveryParser.isDialResponse(response))
+        #expect(response.cacheMaxAge == 1800)
     }
 
     @Test("parses DIAL device description XML and maps descriptor")
     func parseDialXMLAndDescriptor() throws {
         let xml = Data(#"""
-<?xml version="1.0"?>
-<root>
-  <device>
-    <friendlyName>Kitchen speaker</friendlyName>
-    <manufacturer>Google Inc.</manufacturer>
-    <modelName>Google Cast Group</modelName>
-    <UDN>uuid:12345678-1234-1234-1234-1234567890ab</UDN>
-  </device>
-</root>
-"""#.utf8)
-        let response = CastSSDPDiscoveryResponse(
-            locationURL: try #require(URL(string: "http://192.168.1.25:8008/ssdp/device-desc.xml")),
+        <?xml version="1.0"?>
+        <root>
+          <device>
+            <friendlyName>Kitchen speaker</friendlyName>
+            <manufacturer>Google Inc.</manufacturer>
+            <modelName>Google Cast Group</modelName>
+            <UDN>uuid:12345678-1234-1234-1234-1234567890ab</UDN>
+          </device>
+        </root>
+        """#.utf8)
+        let response = try CastSSDPDiscoveryParser.Response(
+            locationURL: #require(URL(string: "http://192.168.1.25:8008/ssdp/device-desc.xml")),
             usn: nil,
-            searchTarget: CastSSDPDiscoveryParser.dialSearchTarget
+            searchTarget: CastSSDPDiscoveryParser.dialSearchTarget,
+            cacheMaxAge: nil
         )
         let description = try #require(CastSSDPDiscoveryParser.parseDIALDeviceDescription(xml))
         let descriptor = try #require(

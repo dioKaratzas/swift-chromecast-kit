@@ -11,14 +11,20 @@ import Foundation
 /// It exposes ergonomic receiver/media controllers while hiding transport, wire models,
 /// and protocol machinery.
 public actor CastSession {
+    // MARK: Public State
+
     public nonisolated let device: CastDeviceDescriptor
     public nonisolated let media: CastMediaController
     public nonisolated let receiver: CastReceiverController
     public nonisolated let multizone: CastMultizoneController
 
+    // MARK: Private State
+
     private let runtime: CastSessionRuntime
-    private var namespaceHandlers = [CastSessionNamespaceHandlerToken: any CastSessionNamespaceHandler]()
+    private var namespaceHandlers = [NamespaceHandlerToken: any CastSessionNamespaceHandler]()
     private var namespaceHandlerFanoutTask: Task<Void, Never>?
+
+    // MARK: Initialization
 
     /// Creates a Cast session for a discovered device using the built-in Cast v2 TLS transport.
     public init(
@@ -39,13 +45,7 @@ public actor CastSession {
         self.multizone = runtime.multizone
     }
 
-    init(runtime: CastSessionRuntime) {
-        self.device = runtime.device
-        self.runtime = runtime
-        self.media = runtime.media
-        self.receiver = runtime.receiver
-        self.multizone = runtime.multizone
-    }
+    // MARK: Connection Lifecycle
 
     /// Establishes the Cast transport connection.
     public func connect() async throws {
@@ -62,6 +62,8 @@ public actor CastSession {
         try await runtime.reconnect()
     }
 
+    // MARK: Session State / Streams
+
     /// Returns the current connection lifecycle state.
     public func connectionState() async -> ConnectionState {
         await runtime.connectionState().publicValue
@@ -70,7 +72,7 @@ public actor CastSession {
     /// Emits connection lifecycle events for this session.
     public func connectionEvents() async -> AsyncStream<ConnectionEvent> {
         let coreStream = await runtime.connectionEvents()
-        return mapStream(coreStream) { $0.publicValue }
+        return Self.mapStream(coreStream) { $0.publicValue }
     }
 
     /// Returns the latest known receiver status, if any.
@@ -96,8 +98,10 @@ public actor CastSession {
     /// Emits session status updates as receiver/media statuses change.
     public func stateEvents() async -> AsyncStream<StateEvent> {
         let coreStream = await runtime.stateEvents()
-        return mapStream(coreStream) { $0.publicValue }
+        return Self.mapStream(coreStream) { $0.publicValue }
     }
+
+    // MARK: Custom Namespace Messaging
 
     /// Sends a typed JSON object on a Cast namespace and injects a `requestId` for correlation.
     @discardableResult
@@ -181,7 +185,7 @@ public actor CastSession {
     /// Pass a specific namespace to filter to a single app-defined channel.
     public func namespaceMessages(_ namespace: CastNamespace? = nil) async -> AsyncStream<NamespaceMessage> {
         let coreStream = await runtime.namespaceMessages(namespace: namespace)
-        return mapStream(coreStream) { $0.publicNamespaceMessage }
+        return Self.mapStream(coreStream) { $0.publicNamespaceMessage }
     }
 
     /// Emits inbound custom namespace messages (UTF-8 or binary).
@@ -189,7 +193,7 @@ public actor CastSession {
     /// This low-level API is useful for advanced integrations and app-specific protocols.
     public func namespaceEvents(_ namespace: CastNamespace? = nil) async -> AsyncStream<NamespaceEvent> {
         let coreStream = await runtime.namespaceEvents(namespace: namespace)
-        return mapStream(coreStream) { $0.publicNamespaceEvent }
+        return Self.mapStream(coreStream) { $0.publicNamespaceEvent }
     }
 
     /// Registers a custom namespace event handler.
@@ -199,15 +203,15 @@ public actor CastSession {
     @discardableResult
     public func registerNamespaceHandler(
         _ handler: any CastSessionNamespaceHandler
-    ) -> CastSessionNamespaceHandlerToken {
-        let token = CastSessionNamespaceHandlerToken(rawValue: UUID())
+    ) -> NamespaceHandlerToken {
+        let token = NamespaceHandlerToken(rawValue: UUID())
         namespaceHandlers[token] = handler
         startNamespaceHandlerFanoutIfNeeded()
         return token
     }
 
     /// Unregisters a previously registered custom namespace event handler.
-    public func unregisterNamespaceHandler(_ token: CastSessionNamespaceHandlerToken) {
+    public func unregisterNamespaceHandler(_ token: NamespaceHandlerToken) {
         namespaceHandlers[token] = nil
         stopNamespaceHandlerFanoutIfNeeded()
     }
@@ -217,6 +221,18 @@ public actor CastSession {
         namespaceHandlers.removeAll(keepingCapacity: false)
         stopNamespaceHandlerFanoutIfNeeded(force: true)
     }
+
+    // MARK: Internal Initialization
+
+    init(runtime: CastSessionRuntime) {
+        self.device = runtime.device
+        self.runtime = runtime
+        self.media = runtime.media
+        self.receiver = runtime.receiver
+        self.multizone = runtime.multizone
+    }
+
+    // MARK: Private Helpers
 
     private func startNamespaceHandlerFanoutIfNeeded() {
         guard namespaceHandlerFanoutTask == nil, namespaceHandlers.isEmpty == false else {
@@ -256,27 +272,29 @@ public actor CastSession {
     }
 }
 
-private final class StreamMapTaskBox: @unchecked Sendable {
-    var task: Task<Void, Never>?
-}
+private extension CastSession {
+    final class StreamMapTaskBox: @unchecked Sendable {
+        var task: Task<Void, Never>?
+    }
 
-private func mapStream<Input: Sendable, Output: Sendable>(
-    _ input: AsyncStream<Input>,
-    transform: @escaping @Sendable (Input) -> Output
-) -> AsyncStream<Output> {
-    AsyncStream<Output> { continuation in
-        let box = StreamMapTaskBox()
-        box.task = Task { [box] in
-            for await value in input {
-                continuation.yield(transform(value))
+    static func mapStream<Input: Sendable, Output: Sendable>(
+        _ input: AsyncStream<Input>,
+        transform: @escaping @Sendable (Input) -> Output
+    ) -> AsyncStream<Output> {
+        AsyncStream<Output> { continuation in
+            let box = StreamMapTaskBox()
+            box.task = Task { [box] in
+                for await value in input {
+                    continuation.yield(transform(value))
+                }
+                continuation.finish()
+                box.task = nil
             }
-            continuation.finish()
-            box.task = nil
-        }
 
-        continuation.onTermination = { [weak box] _ in
-            box?.task?.cancel()
-            box?.task = nil
+            continuation.onTermination = { [weak box] _ in
+                box?.task?.cancel()
+                box?.task = nil
+            }
         }
     }
 }

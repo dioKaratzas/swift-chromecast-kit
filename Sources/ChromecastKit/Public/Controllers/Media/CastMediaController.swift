@@ -10,6 +10,8 @@ import Foundation
 /// This actor emits typed media commands to the currently active application transport.
 /// Response parsing and session/media status handling will be layered on top later.
 public actor CastMediaController {
+    // MARK: Public Models
+
     /// Options for `load(_:options:)`.
     public struct LoadOptions: Sendable, Hashable, Codable {
         public var autoplay: Bool
@@ -121,19 +123,12 @@ public actor CastMediaController {
         }
     }
 
+    // MARK: Private State
+
     private let dispatcher: CastCommandDispatcher
     private var mediaSessionID: CastMediaSessionID?
 
-    init(dispatcher: CastCommandDispatcher) {
-        self.dispatcher = dispatcher
-    }
-
-    /// Sets the active media session ID used for session-bound media commands.
-    ///
-    /// This is typically sourced from media status updates after a `LOAD` succeeds.
-    func setMediaSessionID(_ mediaSessionID: CastMediaSessionID?) {
-        self.mediaSessionID = mediaSessionID
-    }
+    // MARK: Public API
 
     /// Requests media status from the active media transport.
     @discardableResult
@@ -407,10 +402,27 @@ public actor CastMediaController {
         try await queueUpdate(options: .init(jump: -1))
     }
 
+    // MARK: Internal Session Wiring
+
+    init(dispatcher: CastCommandDispatcher) {
+        self.dispatcher = dispatcher
+    }
+
+    // MARK: Private Helpers
+
     private func requireMediaSessionID() throws -> CastMediaSessionID {
         guard let mediaSessionID else {
             throw CastError.noActiveMediaSession
         }
         return mediaSessionID
+    }
+
+    // MARK: Internal Runtime Hooks
+
+    /// Sets the active media session ID used for session-bound media commands.
+    ///
+    /// This is typically sourced from media status updates after a `LOAD` succeeds.
+    func setMediaSessionID(_ mediaSessionID: CastMediaSessionID?) {
+        self.mediaSessionID = mediaSessionID
     }
 }

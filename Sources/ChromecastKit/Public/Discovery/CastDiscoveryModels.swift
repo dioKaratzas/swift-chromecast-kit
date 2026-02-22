@@ -5,6 +5,8 @@
 
 import Foundation
 
+// MARK: - Configuration
+
 /// Configuration for Cast device discovery behavior.
 public struct CastDiscoveryConfiguration: Sendable, Hashable {
     public var includeGroups: Bool
@@ -21,6 +23,8 @@ public struct CastDiscoveryConfiguration: Sendable, Hashable {
         self.enableSSDPFallback = enableSSDPFallback
     }
 }
+
+// MARK: - Runtime State / Events
 
 /// Runtime state of the discovery subsystem.
 public enum CastDiscoveryState: Sendable, Hashable {

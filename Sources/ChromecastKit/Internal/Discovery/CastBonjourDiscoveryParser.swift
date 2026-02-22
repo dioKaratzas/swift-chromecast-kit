@@ -6,21 +6,14 @@
 @preconcurrency import Network
 import Foundation
 
-struct CastBonjourServiceIdentity: Sendable, Hashable {
-    let name: String
-    let type: String
-    let domain: String
-}
-
-struct CastBonjourResolvedEndpoint: Sendable, Hashable {
-    let host: String
-    let port: Int
-}
-
 enum CastBonjourDiscoveryParser {
+    // MARK: Constants
+
     static let serviceType = "_googlecast._tcp"
 
-    static func serviceIdentity(from endpoint: NWEndpoint) -> CastBonjourServiceIdentity? {
+    // MARK: Parsing
+
+    static func serviceIdentity(from endpoint: NWEndpoint) -> ServiceIdentity? {
         guard case let .service(name, type, domain, _) = endpoint else {
             return nil
         }
@@ -36,7 +29,7 @@ enum CastBonjourDiscoveryParser {
 
     static func deviceDescriptor(
         serviceName: String,
-        resolvedEndpoint: CastBonjourResolvedEndpoint,
+        resolvedEndpoint: ResolvedEndpoint,
         txt: [String: String]
     ) -> CastDeviceDescriptor {
         let deviceID = CastDeviceID(txt["id"] ?? serviceName)
@@ -113,5 +106,18 @@ enum CastBonjourDiscoveryParser {
             .joined(separator: " ")
             .lowercased()
         return haystack.contains("group")
+    }
+}
+
+extension CastBonjourDiscoveryParser {
+    struct ServiceIdentity: Sendable, Hashable {
+        let name: String
+        let type: String
+        let domain: String
+    }
+
+    struct ResolvedEndpoint: Sendable, Hashable {
+        let host: String
+        let port: Int
     }
 }

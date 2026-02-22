@@ -10,11 +10,11 @@ import Foundation
 /// This actor builds typed receiver requests and delegates route/request handling
 /// to the command dispatcher.
 public actor CastReceiverController {
+    // MARK: Private State
+
     private let dispatcher: CastCommandDispatcher
 
-    init(dispatcher: CastCommandDispatcher) {
-        self.dispatcher = dispatcher
-    }
+    // MARK: Public API
 
     /// Requests receiver status from the Cast platform namespace.
     @discardableResult
@@ -74,5 +74,11 @@ public actor CastReceiverController {
             target: .platform,
             payload: CastReceiverPayloadBuilder.getAppAvailability(appIDs: appIDs)
         )
+    }
+
+    // MARK: Internal Initialization
+
+    init(dispatcher: CastCommandDispatcher) {
+        self.dispatcher = dispatcher
     }
 }

@@ -10,12 +10,16 @@ import Foundation
 /// The public `CastDiscovery` actor performs deduplication and state ownership, so this
 /// composite simply forwards backend events.
 actor CompositeCastDiscoveryBrowser: CastDiscoveryBrowser {
+    // MARK: State
+
     private let mdnsBrowser: any CastDiscoveryBrowser
     private let ssdpBrowser: any CastDiscoveryBrowser
 
     private var eventContinuations = [UUID: AsyncStream<CastDiscoveryBrowserEvent>.Continuation]()
     private var backendTasks = [Task<Void, Never>]()
     private var isRunning = false
+
+    // MARK: Initialization
 
     init(
         mdnsBrowser: any CastDiscoveryBrowser = NWDNSSDDiscoveryBrowser(),
@@ -24,6 +28,8 @@ actor CompositeCastDiscoveryBrowser: CastDiscoveryBrowser {
         self.mdnsBrowser = mdnsBrowser
         self.ssdpBrowser = ssdpBrowser
     }
+
+    // MARK: CastDiscoveryBrowser
 
     func events() async -> AsyncStream<CastDiscoveryBrowserEvent> {
         let id = UUID()
@@ -75,6 +81,8 @@ actor CompositeCastDiscoveryBrowser: CastDiscoveryBrowser {
         await mdnsBrowser.stop()
         await ssdpBrowser.stop()
     }
+
+    // MARK: Private Helpers
 
     private func startForwardingTask(for browser: any CastDiscoveryBrowser) {
         let task = Task {

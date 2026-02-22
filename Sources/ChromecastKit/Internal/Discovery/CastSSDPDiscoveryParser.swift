@@ -5,40 +5,31 @@
 
 import Foundation
 
-struct CastSSDPDiscoveryResponse: Sendable, Hashable {
-    let locationURL: URL
-    let usn: String?
-    let searchTarget: String?
-}
-
-struct CastDIALDeviceDescription: Sendable, Hashable {
-    let friendlyName: String?
-    let modelName: String?
-    let manufacturer: String?
-    let udn: String?
-    let uuid: UUID?
-}
-
 enum CastSSDPDiscoveryParser {
+    // MARK: Constants
+
     static let multicastHost = "239.255.255.250"
     static let multicastPort = 1900
     static let dialSearchTarget = "urn:dial-multiscreen-org:service:dial:1"
 
-    static func parseSearchResponse(_ data: Data) -> CastSSDPDiscoveryResponse? {
+    // MARK: Parsing
+
+    static func parseSearchResponse(_ data: Data) -> Response? {
         guard let text = String(data: data, encoding: .utf8) else {
             return nil
         }
         let normalized = text.replacingOccurrences(of: "\r\n", with: "\n")
         let lines = normalized.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
         guard let first = lines.first,
-              first.uppercased().hasPrefix("HTTP/1.1 200") || first.uppercased().hasPrefix("HTTP/1.0 200")
-        else {
+              first.uppercased().hasPrefix("HTTP/1.1 200") || first.uppercased().hasPrefix("HTTP/1.0 200") else {
             return nil
         }
 
         var headers = [String: String]()
         for line in lines.dropFirst() {
-            guard let idx = line.firstIndex(of: ":") else { continue }
+            guard let idx = line.firstIndex(of: ":") else {
+                continue
+            }
             let key = line[..<idx].trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
             let value = line[line.index(after: idx)...].trimmingCharacters(in: .whitespacesAndNewlines)
             headers[key] = value
@@ -51,19 +42,20 @@ enum CastSSDPDiscoveryParser {
         return .init(
             locationURL: locationURL,
             usn: headers["usn"],
-            searchTarget: headers["st"]
+            searchTarget: headers["st"],
+            cacheMaxAge: parseCacheMaxAge(headers["cache-control"])
         )
     }
 
-    static func isDialResponse(_ response: CastSSDPDiscoveryResponse) -> Bool {
+    static func isDialResponse(_ response: Response) -> Bool {
         let st = response.searchTarget?.lowercased()
         let usn = response.usn?.lowercased()
         return st == dialSearchTarget || usn?.contains(dialSearchTarget) == true
     }
 
-    static func parseDIALDeviceDescription(_ data: Data) -> CastDIALDeviceDescription? {
+    static func parseDIALDeviceDescription(_ data: Data) -> DIALDeviceDescription? {
         let parser = XMLParser(data: data)
-        let delegate = DIALDescriptionXMLDelegate()
+        let delegate = XMLDeviceDescriptionDelegate()
         parser.delegate = delegate
         guard parser.parse() else {
             return nil
@@ -72,8 +64,8 @@ enum CastSSDPDiscoveryParser {
     }
 
     static func makeDescriptor(
-        from response: CastSSDPDiscoveryResponse,
-        description: CastDIALDeviceDescription,
+        from response: Response,
+        description: DIALDeviceDescription,
         includeGroups: Bool
     ) -> CastDeviceDescriptor? {
         let host = response.locationURL.host ?? response.locationURL.absoluteString
@@ -120,77 +112,120 @@ enum CastSSDPDiscoveryParser {
 
     private static func normalizeDeviceID(fromUDN udn: String) -> CastDeviceID? {
         let trimmed = udn.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard trimmed.isEmpty == false else { return nil }
+        guard trimmed.isEmpty == false else {
+            return nil
+        }
         let normalized = trimmed.lowercased().hasPrefix("uuid:") ? String(trimmed.dropFirst(5)) : trimmed
         return CastDeviceID(normalized.lowercased())
     }
+
+    private static func parseCacheMaxAge(_ cacheControl: String?) -> TimeInterval? {
+        guard let cacheControl else {
+            return nil
+        }
+
+        for part in cacheControl.split(separator: ",") {
+            let trimmed = part.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard trimmed.lowercased().hasPrefix("max-age=") else {
+                continue
+            }
+            let raw = trimmed.dropFirst("max-age=".count)
+            if let seconds = TimeInterval(raw) {
+                return seconds
+            }
+        }
+        return nil
+    }
 }
 
-private final class DIALDescriptionXMLDelegate: NSObject, XMLParserDelegate {
-    private var currentElement: String?
-    private var currentText = ""
-    private var friendlyName: String?
-    private var modelName: String?
-    private var manufacturer: String?
-    private var udn: String?
-
-    func parser(
-        _: XMLParser,
-        didStartElement elementName: String,
-        namespaceURI _: String?,
-        qualifiedName _: String?,
-        attributes _: [String: String] = [:]
-    ) {
-        currentElement = elementName.lowercased()
-        currentText = ""
+extension CastSSDPDiscoveryParser {
+    struct Response: Sendable, Hashable {
+        let locationURL: URL
+        let usn: String?
+        let searchTarget: String?
+        let cacheMaxAge: TimeInterval?
     }
 
-    func parser(_: XMLParser, foundCharacters string: String) {
-        currentText += string
+    struct DIALDeviceDescription: Sendable, Hashable {
+        let friendlyName: String?
+        let modelName: String?
+        let manufacturer: String?
+        let udn: String?
+        let uuid: UUID?
     }
+}
 
-    func parser(
-        _: XMLParser,
-        didEndElement elementName: String,
-        namespaceURI _: String?,
-        qualifiedName _: String?
-    ) {
-        let element = elementName.lowercased()
-        let value = currentText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard value.isEmpty == false else {
+private extension CastSSDPDiscoveryParser {
+    // MARK: XML Parsing Delegate
+
+    final class XMLDeviceDescriptionDelegate: NSObject, XMLParserDelegate {
+        private var currentElement: String?
+        private var currentText = ""
+        private var friendlyName: String?
+        private var modelName: String?
+        private var manufacturer: String?
+        private var udn: String?
+
+        func parser(
+            _: XMLParser,
+            didStartElement elementName: String,
+            namespaceURI _: String?,
+            qualifiedName _: String?,
+            attributes _: [String: String] = [:]
+        ) {
+            currentElement = elementName.lowercased()
+            currentText = ""
+        }
+
+        func parser(_: XMLParser, foundCharacters string: String) {
+            currentText += string
+        }
+
+        func parser(
+            _: XMLParser,
+            didEndElement elementName: String,
+            namespaceURI _: String?,
+            qualifiedName _: String?
+        ) {
+            let element = elementName.lowercased()
+            let value = currentText.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard value.isEmpty == false else {
+                currentElement = nil
+                currentText = ""
+                return
+            }
+
+            switch element {
+            case "friendlyname": friendlyName = value
+            case "modelname": modelName = value
+            case "manufacturer": manufacturer = value
+            case "udn": udn = value
+            default: break
+            }
+
             currentElement = nil
             currentText = ""
-            return
         }
 
-        switch element {
-        case "friendlyname": friendlyName = value
-        case "modelname": modelName = value
-        case "manufacturer": manufacturer = value
-        case "udn": udn = value
-        default: break
+        // MARK: Description
+
+        func makeDescription() -> DIALDeviceDescription {
+            let parsedUUID: UUID?
+            if let udn {
+                let normalized = udn.lowercased().hasPrefix("uuid:") ? String(udn.dropFirst(5)) : udn
+                parsedUUID = UUID(uuidString: normalized)
+            } else {
+                parsedUUID = nil
+            }
+
+            return .init(
+                friendlyName: friendlyName,
+                modelName: modelName,
+                manufacturer: manufacturer,
+                udn: udn,
+                uuid: parsedUUID
+            )
         }
-
-        currentElement = nil
-        currentText = ""
-    }
-
-    func makeDescription() -> CastDIALDeviceDescription {
-        let parsedUUID: UUID?
-        if let udn {
-            let normalized = udn.lowercased().hasPrefix("uuid:") ? String(udn.dropFirst(5)) : udn
-            parsedUUID = UUID(uuidString: normalized)
-        } else {
-            parsedUUID = nil
-        }
-
-        return .init(
-            friendlyName: friendlyName,
-            modelName: modelName,
-            manufacturer: manufacturer,
-            udn: udn,
-            uuid: parsedUUID
-        )
     }
 }
 

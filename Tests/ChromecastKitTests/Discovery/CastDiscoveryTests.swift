@@ -217,6 +217,53 @@ struct CastDiscoveryTests {
         #expect(await events.next() == .deviceUpserted(device: manual, isNew: true))
         #expect(await events.next() == .deviceRemoved(id: manual.id))
     }
+
+    @Test("deduplicates mDNS and SSDP views of the same device by host and preserves richer metadata")
+    func deduplicatesDiscoveredDevicesAcrossBackends() async {
+        let browser = RecordingDiscoveryBrowser()
+        let discovery = CastDiscovery(browser: browser)
+        var events = await discovery.events().makeAsyncIterator()
+
+        let mdns = CastDeviceDescriptor(
+            id: "mdns-id",
+            friendlyName: "Living Room TV",
+            host: "192.168.1.20",
+            port: 8009,
+            modelName: "Chromecast",
+            manufacturer: "Google",
+            uuid: UUID(uuidString: "12345678-1234-1234-1234-1234567890ab"),
+            capabilities: [.video]
+        )
+        let ssdp = CastDeviceDescriptor(
+            id: "ssdp:192.168.1.20:8009",
+            friendlyName: "192.168.1.20",
+            host: "192.168.1.20",
+            port: 8009,
+            modelName: nil,
+            manufacturer: nil,
+            uuid: UUID(uuidString: "12345678-1234-1234-1234-1234567890ab"),
+            capabilities: [.video, .multizone]
+        )
+
+        await discovery.upsertDiscoveredDevice(mdns)
+        await discovery.upsertDiscoveredDevice(ssdp)
+
+        let snapshot = await discovery.devices()
+        #expect(snapshot.count == 1)
+        let only = snapshot[0]
+        #expect(only.id == "mdns-id")
+        #expect(only.friendlyName == "Living Room TV")
+        #expect(only.capabilities.contains(.multizone) == true)
+
+        _ = await events.next() // first insert
+        guard case let .deviceUpserted(device, isNew)? = await events.next() else {
+            Issue.record("Expected merged dedupe upsert")
+            return
+        }
+        #expect(isNew == false)
+        #expect(device.id == "mdns-id")
+        #expect(device.capabilities.contains(.multizone))
+    }
 }
 
 private actor RecordingDiscoveryBrowser: CastDiscoveryBrowser {

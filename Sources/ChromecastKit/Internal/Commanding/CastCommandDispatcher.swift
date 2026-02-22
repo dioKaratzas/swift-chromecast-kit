@@ -5,15 +5,15 @@
 
 import Foundation
 
-enum CastCommandPayload: Sendable, Hashable {
-    case utf8(String)
-    case binary(Data)
-}
-
 struct CastEncodedCommand: Sendable, Hashable {
+    enum Payload: Sendable, Hashable {
+        case utf8(String)
+        case binary(Data)
+    }
+
     let requestID: CastRequestID
     let route: CastMessageRoute
-    let payload: CastCommandPayload
+    let payload: Payload
 
     var payloadUTF8: String {
         guard case let .utf8(value) = payload else {
@@ -34,21 +34,13 @@ protocol CastCommandTransport: Sendable {
     func send(_ command: CastEncodedCommand) async throws
 }
 
-/// One-shot request/reply waiter stored by request ID.
-///
-/// The dispatcher actor owns lifecycle and ensures each continuation is resumed exactly once.
-private struct PendingReply {
-    let requestID: CastRequestID
-    let operation: String
-    let continuation: CheckedContinuation<CastInboundMessage, any Error>
-    var timeoutTask: Task<Void, Never>?
-}
-
 /// Actor responsible for route resolution, request ID assignment, and payload encoding.
 ///
 /// This layer sits between high-level controllers and the eventual socket/protobuf transport.
 /// It keeps transport concerns out of controller APIs while preserving typed payload models.
 actor CastCommandDispatcher {
+    // MARK: State
+
     private let transport: any CastCommandTransport
     private let defaultReplyTimeout: TimeInterval
     private var requestIDs = CastRequestIDGenerator()
@@ -66,6 +58,8 @@ actor CastCommandDispatcher {
         self.defaultReplyTimeout = defaultReplyTimeout
     }
 
+    // MARK: Configuration
+
     func setSourceID(_ sourceID: CastEndpointID) {
         self.sourceID = sourceID
     }
@@ -73,6 +67,8 @@ actor CastCommandDispatcher {
     func setCurrentApplicationTransportID(_ transportID: CastTransportID?) {
         currentApplicationTransportID = transportID
     }
+
+    // MARK: Command Sending
 
     @discardableResult
     func send<Payload: Encodable & Sendable>(
@@ -190,6 +186,8 @@ actor CastCommandDispatcher {
         return true
     }
 
+    // MARK: Pending Replies
+
     private func registerPendingReply(_ pendingReply: PendingReply, timeout: TimeInterval) {
         pendingReplies[pendingReply.requestID] = pendingReply
 
@@ -232,6 +230,8 @@ actor CastCommandDispatcher {
         pendingReply.timeoutTask?.cancel()
         pendingReply.continuation.resume(throwing: error)
     }
+
+    // MARK: Encoding / Routing
 
     private func makeEncodedCommand<Payload: Encodable & Sendable>(
         namespace: CastNamespace,
@@ -288,6 +288,8 @@ actor CastCommandDispatcher {
             namespace: namespace
         )
     }
+
+    // MARK: JSON Helpers
 
     private func encodePayloadUTF8<Payload: Encodable & Sendable>(
         _ payload: Payload,
@@ -383,5 +385,17 @@ actor CastCommandDispatcher {
         var updated = object
         updated["requestId"] = .number(Double(requestID.rawValue))
         return try JSONEncoder().encode(updated)
+    }
+}
+
+private extension CastCommandDispatcher {
+    /// One-shot request/reply waiter stored by request ID.
+    ///
+    /// The dispatcher actor owns lifecycle and ensures each continuation is resumed exactly once.
+    struct PendingReply {
+        let requestID: CastRequestID
+        let operation: String
+        let continuation: CheckedContinuation<CastInboundMessage, any Error>
+        var timeoutTask: Task<Void, Never>?
     }
 }

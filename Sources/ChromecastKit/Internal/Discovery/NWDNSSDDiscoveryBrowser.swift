@@ -12,13 +12,17 @@ import Foundation
 /// It browses `_googlecast._tcp`, extracts TXT metadata, then performs a lightweight
 /// TCP connect to resolve the service endpoint to a host/port suitable for session setup.
 actor NWDNSSDDiscoveryBrowser: CastDiscoveryBrowser {
+    // MARK: State
+
     private let callbackQueue = DispatchQueue(label: "ChromecastKit.Discovery.NWBrowser")
 
     private var browser: NWBrowser?
     private var configuration = CastDiscoveryConfiguration()
     private var eventContinuations = [UUID: AsyncStream<CastDiscoveryBrowserEvent>.Continuation]()
-    private var resolutionTasks = [CastBonjourServiceIdentity: Task<Void, Never>]()
-    private var discoveredDeviceIDsByService = [CastBonjourServiceIdentity: CastDeviceID]()
+    private var resolutionTasks = [CastBonjourDiscoveryParser.ServiceIdentity: Task<Void, Never>]()
+    private var discoveredDeviceIDsByService = [CastBonjourDiscoveryParser.ServiceIdentity: CastDeviceID]()
+
+    // MARK: Browser Lifecycle
 
     func events() async -> AsyncStream<CastDiscoveryBrowserEvent> {
         let id = UUID()
@@ -67,6 +71,8 @@ actor NWDNSSDDiscoveryBrowser: CastDiscoveryBrowser {
         resolutionTasks.removeAll()
         discoveredDeviceIDsByService.removeAll()
     }
+
+    // MARK: Browser Callbacks
 
     private func handleBrowserState(_ state: NWBrowser.State) {
         switch state {
@@ -150,14 +156,14 @@ actor NWDNSSDDiscoveryBrowser: CastDiscoveryBrowser {
 
     private func finishResolvedDevice(
         _ descriptor: CastDeviceDescriptor,
-        for service: CastBonjourServiceIdentity
+        for service: CastBonjourDiscoveryParser.ServiceIdentity
     ) {
         clearResolutionTask(for: service)
         discoveredDeviceIDsByService[service] = descriptor.id
         emit(.deviceUpserted(descriptor))
     }
 
-    private func removeKnownDeviceIfPresent(for service: CastBonjourServiceIdentity) {
+    private func removeKnownDeviceIfPresent(for service: CastBonjourDiscoveryParser.ServiceIdentity) {
         clearResolutionTask(for: service)
         guard let deviceID = discoveredDeviceIDsByService.removeValue(forKey: service) else {
             return
@@ -165,7 +171,7 @@ actor NWDNSSDDiscoveryBrowser: CastDiscoveryBrowser {
         emit(.deviceRemoved(deviceID))
     }
 
-    private func clearResolutionTask(for service: CastBonjourServiceIdentity) {
+    private func clearResolutionTask(for service: CastBonjourDiscoveryParser.ServiceIdentity) {
         resolutionTasks[service]?.cancel()
         resolutionTasks[service] = nil
     }
@@ -188,7 +194,9 @@ actor NWDNSSDDiscoveryBrowser: CastDiscoveryBrowser {
         eventContinuations[id] = nil
     }
 
-    private static func resolveEndpoint(for endpoint: NWEndpoint) async throws -> CastBonjourResolvedEndpoint {
+    // MARK: Endpoint Resolution
+
+    private static func resolveEndpoint(for endpoint: NWEndpoint) async throws -> CastBonjourDiscoveryParser.ResolvedEndpoint {
         switch endpoint {
         case let .hostPort(host, port):
             return .init(host: hostString(host), port: Int(port.rawValue))
@@ -198,7 +206,7 @@ actor NWDNSSDDiscoveryBrowser: CastDiscoveryBrowser {
             throw CastError.discoveryFailed("Unsupported Cast service endpoint: \(endpoint)")
         }
 
-        return try await withThrowingTaskGroup(of: CastBonjourResolvedEndpoint.self) { group in
+        return try await withThrowingTaskGroup(of: CastBonjourDiscoveryParser.ResolvedEndpoint.self) { group in
             group.addTask {
                 try await resolveEndpointByConnecting(to: endpoint)
             }
@@ -215,7 +223,7 @@ actor NWDNSSDDiscoveryBrowser: CastDiscoveryBrowser {
         }
     }
 
-    private static func resolveEndpointByConnecting(to endpoint: NWEndpoint) async throws -> CastBonjourResolvedEndpoint {
+    private static func resolveEndpointByConnecting(to endpoint: NWEndpoint) async throws -> CastBonjourDiscoveryParser.ResolvedEndpoint {
         let connection = NWConnection(to: endpoint, using: .tcp)
         let queue = DispatchQueue(label: "ChromecastKit.Discovery.Resolve")
         let resolution = ConnectionResolutionBox(connection: connection)
@@ -253,7 +261,7 @@ actor NWDNSSDDiscoveryBrowser: CastDiscoveryBrowser {
         }
     }
 
-    private static func endpointFromNWEndpoint(_ endpoint: NWEndpoint) throws -> CastBonjourResolvedEndpoint {
+    private static func endpointFromNWEndpoint(_ endpoint: NWEndpoint) throws -> CastBonjourDiscoveryParser.ResolvedEndpoint {
         guard case let .hostPort(host, port) = endpoint else {
             throw CastError.discoveryFailed("Cast service did not resolve to host/port endpoint")
         }
@@ -274,38 +282,44 @@ actor NWDNSSDDiscoveryBrowser: CastDiscoveryBrowser {
     }
 }
 
-private final class ConnectionResolutionBox: @unchecked Sendable {
-    private let lock = NSLock()
-    private var continuation: CheckedContinuation<CastBonjourResolvedEndpoint, any Error>?
-    private var isCompleted = false
+private extension NWDNSSDDiscoveryBrowser {
+    /// Coordinates callback-based NWConnection state updates with a one-shot async continuation.
+    ///
+    /// This uses a lock instead of an actor because NWConnection callbacks are synchronous and
+    /// we only need exact-once continuation resumption for a single short-lived resolution task.
+    final class ConnectionResolutionBox: @unchecked Sendable {
+        private let lock = NSLock()
+        private var continuation: CheckedContinuation<CastBonjourDiscoveryParser.ResolvedEndpoint, any Error>?
+        private var isCompleted = false
 
-    init(connection _: NWConnection) {}
+        init(connection _: NWConnection) {}
 
-    func install(_ continuation: CheckedContinuation<CastBonjourResolvedEndpoint, any Error>) {
-        lock.lock()
-        self.continuation = continuation
-        lock.unlock()
-    }
-
-    func resume(with result: Result<CastBonjourResolvedEndpoint, any Error>) {
-        lock.lock()
-        guard isCompleted == false, let continuation else {
+        func install(_ continuation: CheckedContinuation<CastBonjourDiscoveryParser.ResolvedEndpoint, any Error>) {
+            lock.lock()
+            self.continuation = continuation
             lock.unlock()
-            return
         }
-        isCompleted = true
-        self.continuation = nil
-        lock.unlock()
 
-        switch result {
-        case let .success(endpoint):
-            continuation.resume(returning: endpoint)
-        case let .failure(error):
-            continuation.resume(throwing: error)
+        func resume(with result: Result<CastBonjourDiscoveryParser.ResolvedEndpoint, any Error>) {
+            lock.lock()
+            guard isCompleted == false, let continuation else {
+                lock.unlock()
+                return
+            }
+            isCompleted = true
+            self.continuation = nil
+            lock.unlock()
+
+            switch result {
+            case let .success(endpoint):
+                continuation.resume(returning: endpoint)
+            case let .failure(error):
+                continuation.resume(throwing: error)
+            }
         }
-    }
 
-    func cancel() {
-        resume(with: .failure(CancellationError()))
+        func cancel() {
+            resume(with: .failure(CancellationError()))
+        }
     }
 }

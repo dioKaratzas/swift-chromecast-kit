@@ -504,8 +504,8 @@ struct CastSessionTests {
     }
 
     private func nextConnectionEvent(
-        _ iterator: inout AsyncStream<CastConnectionEvent>.AsyncIterator
-    ) async throws -> CastConnectionEvent {
+        _ iterator: inout AsyncStream<CastConnection.Event>.AsyncIterator
+    ) async throws -> CastConnection.Event {
         guard let event = await iterator.next() else {
             throw CastError.invalidResponse("Missing connection event")
         }

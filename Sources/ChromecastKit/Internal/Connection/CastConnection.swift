@@ -16,14 +16,18 @@ protocol CastConnectionTransport: Sendable {
 /// implementation details are injected behind an internal transport protocol so the
 /// state machine can be tested independently.
 actor CastConnection {
-    let configuration: CastConnectionConfiguration
+    // MARK: State
 
-    private var stateValue = CastConnectionState.disconnected
-    private var eventContinuations = [UUID: AsyncStream<CastConnectionEvent>.Continuation]()
+    let configuration: Configuration
+
+    private var stateValue = State.disconnected
+    private var eventContinuations = [UUID: AsyncStream<Event>.Continuation]()
     private let transport: any CastConnectionTransport
 
+    // MARK: Lifecycle
+
     init(
-        configuration: CastConnectionConfiguration = .init(),
+        configuration: Configuration = .init(),
         transport: any CastConnectionTransport
     ) {
         self.configuration = configuration
@@ -31,14 +35,14 @@ actor CastConnection {
     }
 
     /// Returns the current connection state snapshot.
-    func state() -> CastConnectionState {
+    func state() -> State {
         stateValue
     }
 
     /// Subscribes to connection lifecycle events.
     ///
     /// The returned stream is multi-subscriber and cancellation-aware.
-    func events() -> AsyncStream<CastConnectionEvent> {
+    func events() -> AsyncStream<Event> {
         let id = UUID()
 
         return AsyncStream { continuation in
@@ -73,7 +77,7 @@ actor CastConnection {
     }
 
     /// Disconnects the underlying transport and emits a disconnection event.
-    func disconnect(reason: CastDisconnectReason = .requested) async {
+    func disconnect(reason: DisconnectReason = .requested) async {
         await transport.disconnect()
         stateValue = .disconnected
         emit(.disconnected(reason: reason))
@@ -105,7 +109,9 @@ actor CastConnection {
         emit(.error(error))
     }
 
-    private func emit(_ event: CastConnectionEvent) {
+    // MARK: Helpers
+
+    private func emit(_ event: Event) {
         for continuation in eventContinuations.values {
             continuation.yield(event)
         }

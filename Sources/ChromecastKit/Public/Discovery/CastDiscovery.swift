@@ -11,7 +11,11 @@ import Foundation
 /// This keeps the public API stable while enabling independent testing of state and
 /// event semantics before mDNS transport integration is implemented.
 public actor CastDiscovery {
+    // MARK: Public State
+
     public let configuration: CastDiscoveryConfiguration
+
+    // MARK: Private State
 
     private let browser: any CastDiscoveryBrowser
     private var stateValue = CastDiscoveryState.stopped
@@ -21,17 +25,13 @@ public actor CastDiscovery {
     private var browseTimeoutTask: Task<Void, Never>?
     private var activeBrowseRunID: UUID?
 
+    // MARK: Public Initialization
+
     public init(configuration: CastDiscoveryConfiguration = .init()) {
         self.init(configuration: configuration, browser: CompositeCastDiscoveryBrowser())
     }
 
-    init(
-        configuration: CastDiscoveryConfiguration = .init(),
-        browser: any CastDiscoveryBrowser
-    ) {
-        self.configuration = configuration
-        self.browser = browser
-    }
+    // MARK: Public API
 
     /// Current discovery runtime state.
     public func state() -> CastDiscoveryState {
@@ -225,10 +225,36 @@ public actor CastDiscovery {
         removeDiscoveredDevice(id: id)
     }
 
+    // MARK: Internal Initialization
+
+    init(
+        configuration: CastDiscoveryConfiguration = .init(),
+        browser: any CastDiscoveryBrowser
+    ) {
+        self.configuration = configuration
+        self.browser = browser
+    }
+
+    // MARK: Internal Browser Integration
+
     /// Applies or updates a discovered device descriptor.
     ///
     /// This method is `internal` for the eventual mDNS browser integration.
     func upsertDiscoveredDevice(_ device: CastDeviceDescriptor) {
+        if devicesByID[device.id] != nil {
+            devicesByID[device.id] = device
+            emit(.deviceUpserted(device: device, isNew: false))
+            return
+        }
+
+        if let existingID = existingDeviceID(matching: device) {
+            let existing = devicesByID[existingID] ?? device
+            let merged = mergeDiscoveredDevice(existing: existing, incoming: device, preservingID: existingID)
+            devicesByID[existingID] = merged
+            emit(.deviceUpserted(device: merged, isNew: false))
+            return
+        }
+
         let isNew = devicesByID.updateValue(device, forKey: device.id) == nil
         emit(.deviceUpserted(device: device, isNew: isNew))
     }
@@ -242,6 +268,8 @@ public actor CastDiscovery {
         }
         emit(.deviceRemoved(id: id))
     }
+
+    // MARK: Private Helpers
 
     private func emit(_ event: CastDiscoveryEvent) {
         for continuation in eventContinuations.values {
@@ -283,6 +311,53 @@ public actor CastDiscovery {
             return castError
         }
         return .discoveryFailed(String(describing: error))
+    }
+
+    private func existingDeviceID(matching incoming: CastDeviceDescriptor) -> CastDeviceID? {
+        if devicesByID[incoming.id] != nil {
+            return incoming.id
+        }
+
+        if let incomingUUID = incoming.uuid {
+            if let match = devicesByID.values.first(where: { $0.uuid == incomingUUID }) {
+                return match.id
+            }
+        }
+
+        if let match = devicesByID.values.first(where: {
+            $0.host.caseInsensitiveCompare(incoming.host) == .orderedSame && $0.port == incoming.port
+        }) {
+            return match.id
+        }
+
+        return nil
+    }
+
+    private func mergeDiscoveredDevice(
+        existing: CastDeviceDescriptor,
+        incoming: CastDeviceDescriptor,
+        preservingID id: CastDeviceID
+    ) -> CastDeviceDescriptor {
+        let existingLooksLikeHostLabel = existing.friendlyName == existing.host
+        let incomingLooksLikeHostLabel = incoming.friendlyName == incoming.host
+
+        let friendlyName: String
+        if existingLooksLikeHostLabel, incomingLooksLikeHostLabel == false {
+            friendlyName = incoming.friendlyName
+        } else {
+            friendlyName = existing.friendlyName
+        }
+
+        return CastDeviceDescriptor(
+            id: id,
+            friendlyName: friendlyName,
+            host: existing.host,
+            port: existing.port,
+            modelName: incoming.modelName ?? existing.modelName,
+            manufacturer: incoming.manufacturer ?? existing.manufacturer,
+            uuid: existing.uuid ?? incoming.uuid,
+            capabilities: existing.capabilities.union(incoming.capabilities)
+        )
     }
 
     private func scheduleBrowseTimeoutIfNeeded(runID: UUID) {

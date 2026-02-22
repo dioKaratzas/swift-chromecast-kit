@@ -5,7 +5,21 @@
 
 import Foundation
 
+/// Backward-compatible alias for the namespace handler token type.
+public typealias CastSessionNamespaceHandlerToken = CastSession.NamespaceHandlerToken
+
 public extension CastSession {
+    // MARK: Public Models
+
+    /// Token returned when registering a custom namespace handler on a `CastSession`.
+    struct NamespaceHandlerToken: Sendable, Hashable, Codable, RawRepresentable {
+        public let rawValue: UUID
+
+        public init(rawValue: UUID) {
+            self.rawValue = rawValue
+        }
+    }
+
     /// Session connection behavior tuning.
     struct Configuration: Sendable, Hashable, Codable {
         public var connectTimeout: TimeInterval
@@ -172,8 +186,10 @@ public extension CastSession {
     }
 }
 
+// MARK: - Internal Bridging
+
 extension CastSession.Configuration {
-    var coreValue: CastConnectionConfiguration {
+    var coreValue: CastConnection.Configuration {
         .init(
             connectTimeout: connectTimeout,
             commandTimeout: commandTimeout,
@@ -184,7 +200,7 @@ extension CastSession.Configuration {
     }
 }
 
-extension CastDisconnectReason {
+extension CastConnection.DisconnectReason {
     var publicValue: CastSession.DisconnectReason {
         switch self {
         case .requested: .requested
@@ -196,7 +212,7 @@ extension CastDisconnectReason {
 }
 
 extension CastSession.DisconnectReason {
-    var coreValue: CastDisconnectReason {
+    var coreValue: CastConnection.DisconnectReason {
         switch self {
         case .requested: .requested
         case .remoteClosed: .remoteClosed
@@ -206,7 +222,7 @@ extension CastSession.DisconnectReason {
     }
 }
 
-extension CastConnectionState {
+extension CastConnection.State {
     var publicValue: CastSession.ConnectionState {
         switch self {
         case .disconnected: .disconnected
@@ -218,7 +234,7 @@ extension CastConnectionState {
     }
 }
 
-extension CastConnectionEvent {
+extension CastConnection.Event {
     var publicValue: CastSession.ConnectionEvent {
         switch self {
         case .connected: .connected

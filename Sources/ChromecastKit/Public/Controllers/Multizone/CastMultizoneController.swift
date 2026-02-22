@@ -9,13 +9,12 @@ import Foundation
 ///
 /// Use this controller to query group membership and related casting-group metadata.
 public actor CastMultizoneController {
+    // MARK: Private State
+
     private let dispatcher: CastCommandDispatcher
     private let stateStore: CastSessionStateStore
 
-    init(dispatcher: CastCommandDispatcher, stateStore: CastSessionStateStore) {
-        self.dispatcher = dispatcher
-        self.stateStore = stateStore
-    }
+    // MARK: Public API
 
     /// Requests current multizone group membership status.
     @discardableResult
@@ -40,5 +39,12 @@ public actor CastMultizoneController {
     /// Returns the latest known multizone status for this session, if any.
     public func status() async -> CastMultizoneStatus? {
         await stateStore.multizoneStatus()
+    }
+
+    // MARK: Internal Initialization
+
+    init(dispatcher: CastCommandDispatcher, stateStore: CastSessionStateStore) {
+        self.dispatcher = dispatcher
+        self.stateStore = stateStore
     }
 }

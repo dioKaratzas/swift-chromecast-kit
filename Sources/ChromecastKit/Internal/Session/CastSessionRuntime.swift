@@ -78,7 +78,7 @@ actor CastSessionRuntime {
     init(
         device: CastDeviceDescriptor,
         transport: any CastConnectionTransport & CastCommandTransport,
-        configuration: CastConnectionConfiguration = .init()
+        configuration: CastConnection.Configuration = .init()
     ) {
         let connection = CastConnection(configuration: configuration, transport: transport)
         let dispatcher = CastCommandDispatcher(transport: transport, defaultReplyTimeout: configuration.commandTimeout)
@@ -121,7 +121,7 @@ actor CastSessionRuntime {
         }
     }
 
-    func disconnect(reason: CastDisconnectReason = .requested) async {
+    func disconnect(reason: CastConnection.DisconnectReason = .requested) async {
         inboundTask?.cancel()
         inboundTask = nil
         heartbeatTask?.cancel()
@@ -149,11 +149,11 @@ actor CastSessionRuntime {
         }
     }
 
-    func connectionState() async -> CastConnectionState {
+    func connectionState() async -> CastConnection.State {
         await connection.state()
     }
 
-    func connectionEvents() async -> AsyncStream<CastConnectionEvent> {
+    func connectionEvents() async -> AsyncStream<CastConnection.Event> {
         await connection.events()
     }
 
@@ -414,14 +414,18 @@ actor CastSessionRuntime {
             target: .transport(id: currentTransportID),
             payload: CastWire.Connection.ConnectRequest()
         )
-        _ = try await media.getStatus()
+        _ = try await dispatcher.send(
+            namespace: .media,
+            target: .transport(id: currentTransportID),
+            payload: CastMediaPayloadBuilder.getStatus()
+        )
     }
 
     private func heartbeatLastActivityDate() -> Date {
         lastHeartbeatActivityAt
     }
 
-    private func scheduleRecoveryIfNeeded(reason: CastDisconnectReason) {
+    private func scheduleRecoveryIfNeeded(reason: CastConnection.DisconnectReason) {
         guard recoveryTask == nil else {
             return
         }
@@ -437,7 +441,7 @@ actor CastSessionRuntime {
         recoveryTask = nil
     }
 
-    private func performRecovery(reason: CastDisconnectReason) async {
+    private func performRecovery(reason: CastConnection.DisconnectReason) async {
         inboundTask?.cancel()
         inboundTask = nil
         heartbeatTask?.cancel()
@@ -546,7 +550,7 @@ actor CastSessionRuntime {
 
     private func handleBackgroundRuntimeFailure(
         _ error: any Error,
-        recoveryReason: CastDisconnectReason
+        recoveryReason: CastConnection.DisconnectReason
     ) async {
         let castError = (error as? CastError) ?? .connectionFailed(String(describing: error))
         await connection.reportRuntimeError(castError)
