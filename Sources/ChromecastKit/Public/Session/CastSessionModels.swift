@@ -188,63 +188,6 @@ public extension CastSession {
 
 // MARK: - Internal Bridging
 
-extension CastSession.Configuration {
-    var coreValue: CastConnection.Configuration {
-        .init(
-            connectTimeout: connectTimeout,
-            commandTimeout: commandTimeout,
-            heartbeatInterval: heartbeatInterval,
-            autoReconnect: autoReconnect,
-            reconnectRetryDelay: reconnectRetryDelay
-        )
-    }
-}
-
-extension CastConnection.DisconnectReason {
-    var publicValue: CastSession.DisconnectReason {
-        switch self {
-        case .requested: .requested
-        case .remoteClosed: .remoteClosed
-        case .heartbeatTimeout: .heartbeatTimeout
-        case .networkError: .networkError
-        }
-    }
-}
-
-extension CastSession.DisconnectReason {
-    var coreValue: CastConnection.DisconnectReason {
-        switch self {
-        case .requested: .requested
-        case .remoteClosed: .remoteClosed
-        case .heartbeatTimeout: .heartbeatTimeout
-        case .networkError: .networkError
-        }
-    }
-}
-
-extension CastConnection.State {
-    var publicValue: CastSession.ConnectionState {
-        switch self {
-        case .disconnected: .disconnected
-        case .connecting: .connecting
-        case .connected: .connected
-        case .reconnecting: .reconnecting
-        case let .failed(error): .failed(error)
-        }
-    }
-}
-
-extension CastConnection.Event {
-    var publicValue: CastSession.ConnectionEvent {
-        switch self {
-        case .connected: .connected
-        case .reconnected: .reconnected
-        case let .error(error): .error(error)
-        case let .disconnected(reason): .disconnected(reason: reason?.publicValue)
-        }
-    }
-}
-
 extension CastSessionStateSnapshot {
     var publicValue: CastSession.StateSnapshot {
         .init(receiverStatus: receiverStatus, mediaStatus: mediaStatus, multizoneStatus: multizoneStatus)

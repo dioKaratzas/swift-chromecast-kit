@@ -35,7 +35,7 @@ public actor CastSession {
         let runtime = CastSessionRuntime(
             device: device,
             transport: transport,
-            configuration: configuration.coreValue
+            configuration: configuration
         )
 
         self.device = device
@@ -54,7 +54,7 @@ public actor CastSession {
 
     /// Closes the Cast transport connection.
     public func disconnect(reason: DisconnectReason = .requested) async {
-        await runtime.disconnect(reason: reason.coreValue)
+        await runtime.disconnect(reason: reason)
     }
 
     /// Reconnects the Cast transport connection.
@@ -66,13 +66,12 @@ public actor CastSession {
 
     /// Returns the current connection lifecycle state.
     public func connectionState() async -> ConnectionState {
-        await runtime.connectionState().publicValue
+        await runtime.connectionState()
     }
 
     /// Emits connection lifecycle events for this session.
     public func connectionEvents() async -> AsyncStream<ConnectionEvent> {
-        let coreStream = await runtime.connectionEvents()
-        return Self.mapStream(coreStream) { $0.publicValue }
+        await runtime.connectionEvents()
     }
 
     /// Returns the latest known receiver status, if any.
