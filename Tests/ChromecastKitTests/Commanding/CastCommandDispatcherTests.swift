@@ -298,6 +298,40 @@ struct CastCommandDispatcherTests {
         }
     }
 
+    @Test("sendAndAwaitReply maps generic *_ERROR reply variants")
+    func sendAndAwaitReplyMapsErrorSuffixVariants() async throws {
+        let transport = RecordingCommandTransport()
+        let dispatcher = CastCommandDispatcher(transport: transport)
+
+        let replyTask = Task {
+            try await dispatcher.sendAndAwaitReply(
+                namespace: .receiver,
+                target: .platform,
+                payload: CastReceiverPayloadBuilder.getStatus()
+            )
+        }
+        for _ in 0 ..< 10 {
+            if await transport.commands().count >= 1 {
+                break
+            }
+            await Task.yield()
+        }
+
+        _ = try await dispatcher.consumeInboundMessage(
+            .init(
+                route: .init(sourceID: "receiver-0", destinationID: "sender-0", namespace: .receiver),
+                payloadUTF8: #"{"type":"LAUNCH_ERROR","requestId":1,"message":"app unavailable","code":"101"}"#
+            )
+        )
+
+        do {
+            _ = try await replyTask.value
+            Issue.record("Expected LAUNCH_ERROR reply to throw")
+        } catch let error as CastError {
+            #expect(error == .requestFailed(code: 101, message: "app unavailable"))
+        }
+    }
+
     @Test("binary tracked sends inject requestId into json bytes")
     func sendBinaryInjectsRequestID() async throws {
         let transport = RecordingCommandTransport()

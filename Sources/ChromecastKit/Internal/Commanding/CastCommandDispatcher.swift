@@ -352,7 +352,7 @@ actor CastCommandDispatcher {
         case "NOT_ALLOWED", "NOT_SUPPORTED", "ERROR":
             return .requestFailed(code: code, message: message)
         default:
-            if type.hasSuffix("_FAILED") || type.hasPrefix("INVALID_") {
+            if type.hasSuffix("_FAILED") || type.hasSuffix("_ERROR") || type.hasPrefix("INVALID_") {
                 return .requestFailed(code: code, message: message)
             }
             return nil

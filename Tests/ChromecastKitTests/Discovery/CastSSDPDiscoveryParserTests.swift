@@ -26,6 +26,40 @@ struct CastSSDPDiscoveryParserTests {
         #expect(response.cacheMaxAge == 1800)
     }
 
+    @Test("parses cache-control max-age with additional directives")
+    func parseSearchResponseCacheControlVariants() throws {
+        let data = Data(#"""
+        HTTP/1.1 200 OK
+        CACHE-CONTROL: public, max-age=900, must-revalidate
+        LOCATION: http://192.168.1.30:8008/ssdp/device-desc.xml
+        ST: urn:dial-multiscreen-org:service:dial:1
+
+        """#.utf8)
+
+        let response = try #require(CastSSDPDiscoveryParser.parseSearchResponse(data))
+        #expect(response.cacheMaxAge == 900)
+    }
+
+    @Test("DIAL XML parsing supports namespaced element names")
+    func parseNamespacedDialXML() throws {
+        let xml = Data(#"""
+        <?xml version="1.0"?>
+        <root xmlns:d="urn:schemas-upnp-org:device-1-0">
+          <d:device>
+            <d:friendlyName>Bedroom TV</d:friendlyName>
+            <d:manufacturer>Google</d:manufacturer>
+            <d:modelName>Chromecast</d:modelName>
+            <d:UDN>uuid:aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee</d:UDN>
+          </d:device>
+        </root>
+        """#.utf8)
+
+        let description = try #require(CastSSDPDiscoveryParser.parseDIALDeviceDescription(xml))
+        #expect(description.friendlyName == "Bedroom TV")
+        #expect(description.modelName == "Chromecast")
+        #expect(description.uuid == UUID(uuidString: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"))
+    }
+
     @Test("parses DIAL device description XML and maps descriptor")
     func parseDialXMLAndDescriptor() throws {
         let xml = Data(#"""

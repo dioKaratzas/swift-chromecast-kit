@@ -173,7 +173,7 @@ private extension CastSSDPDiscoveryParser {
             qualifiedName _: String?,
             attributes _: [String: String] = [:]
         ) {
-            currentElement = elementName.lowercased()
+            currentElement = localElementName(elementName)
             currentText = ""
         }
 
@@ -187,7 +187,7 @@ private extension CastSSDPDiscoveryParser {
             namespaceURI _: String?,
             qualifiedName _: String?
         ) {
-            let element = elementName.lowercased()
+            let element = localElementName(elementName)
             let value = currentText.trimmingCharacters(in: .whitespacesAndNewlines)
             guard value.isEmpty == false else {
                 currentElement = nil
@@ -225,6 +225,14 @@ private extension CastSSDPDiscoveryParser {
                 udn: udn,
                 uuid: parsedUUID
             )
+        }
+
+        private func localElementName(_ name: String) -> String {
+            let lowered = name.lowercased()
+            guard let colon = lowered.lastIndex(of: ":") else {
+                return lowered
+            }
+            return String(lowered[lowered.index(after: colon)...])
         }
     }
 }
