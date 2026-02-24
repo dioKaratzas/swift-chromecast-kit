@@ -14,11 +14,6 @@ import Foundation
 actor SSDPCastDiscoveryBrowser: CastDiscoveryBrowser {
     // MARK: Models
 
-    private struct KnownLocationEntry: Sendable, Hashable {
-        var deviceID: CastDeviceID
-        var expiresAt: Date?
-    }
-
     // MARK: State
 
     private let callbackQueue = DispatchQueue(label: "ChromecastKit.Discovery.SSDP")
@@ -28,7 +23,7 @@ actor SSDPCastDiscoveryBrowser: CastDiscoveryBrowser {
     private var isRunning = false
     private var eventContinuations = [UUID: AsyncStream<CastDiscoveryBrowserEvent>.Continuation]()
     private var pollTask: Task<Void, Never>?
-    private var knownByLocation = [URL: KnownLocationEntry]()
+    private var knownLocations = KnownLocationRegistry()
     private var detailFetchTasks = [URL: Task<Void, Never>]()
 
     // MARK: CastDiscoveryBrowser
@@ -92,7 +87,7 @@ actor SSDPCastDiscoveryBrowser: CastDiscoveryBrowser {
         detailFetchTasks.removeAll(keepingCapacity: false)
         connection?.cancel()
         connection = nil
-        knownByLocation.removeAll(keepingCapacity: false)
+        knownLocations.removeAll(keepingCapacity: false)
     }
 
     // MARK: Polling / Receive
@@ -204,8 +199,11 @@ actor SSDPCastDiscoveryBrowser: CastDiscoveryBrowser {
         locationURL: URL,
         cacheMaxAge: TimeInterval?
     ) {
-        let expiresAt = cacheMaxAge.map { Date().addingTimeInterval($0) }
-        knownByLocation[locationURL] = .init(deviceID: descriptor.id, expiresAt: expiresAt)
+        knownLocations.upsert(
+            locationURL: locationURL,
+            deviceID: descriptor.id,
+            cacheMaxAge: cacheMaxAge
+        )
         emit(.deviceUpserted(descriptor))
     }
 
@@ -217,19 +215,8 @@ actor SSDPCastDiscoveryBrowser: CastDiscoveryBrowser {
     }
 
     private func expireKnownLocationsIfNeeded(now: Date = .init()) {
-        var expiredLocations = [URL]()
-        for (locationURL, entry) in knownByLocation {
-            guard let expiresAt = entry.expiresAt, expiresAt <= now else {
-                continue
-            }
-            expiredLocations.append(locationURL)
-        }
-
-        for locationURL in expiredLocations {
-            guard let entry = knownByLocation.removeValue(forKey: locationURL) else {
-                continue
-            }
-            emit(.deviceRemoved(entry.deviceID))
+        for deviceID in knownLocations.expire(now: now) {
+            emit(.deviceRemoved(deviceID))
         }
     }
 
@@ -258,5 +245,53 @@ actor SSDPCastDiscoveryBrowser: CastDiscoveryBrowser {
 
     private func removeContinuation(id: UUID) {
         eventContinuations[id] = nil
+    }
+}
+
+extension SSDPCastDiscoveryBrowser {
+    // MARK: Backend Cache Registry
+
+    struct KnownLocationRegistry: Sendable {
+        struct Entry: Sendable, Hashable {
+            var deviceID: CastDeviceID
+            var expiresAt: Date?
+        }
+
+        private(set) var entries = [URL: Entry]()
+
+        mutating func upsert(
+            locationURL: URL,
+            deviceID: CastDeviceID,
+            cacheMaxAge: TimeInterval?,
+            now: Date = .init()
+        ) {
+            let expiresAt = cacheMaxAge.map { now.addingTimeInterval($0) }
+            entries[locationURL] = .init(deviceID: deviceID, expiresAt: expiresAt)
+        }
+
+        mutating func expire(now: Date = .init()) -> [CastDeviceID] {
+            var expiredLocationURLs = [URL]()
+            var removedDeviceIDs = [CastDeviceID]()
+
+            for (locationURL, entry) in entries {
+                guard let expiresAt = entry.expiresAt, expiresAt <= now else {
+                    continue
+                }
+                expiredLocationURLs.append(locationURL)
+            }
+
+            for locationURL in expiredLocationURLs {
+                guard let entry = entries.removeValue(forKey: locationURL) else {
+                    continue
+                }
+                removedDeviceIDs.append(entry.deviceID)
+            }
+
+            return removedDeviceIDs
+        }
+
+        mutating func removeAll(keepingCapacity: Bool) {
+            entries.removeAll(keepingCapacity: keepingCapacity)
+        }
     }
 }

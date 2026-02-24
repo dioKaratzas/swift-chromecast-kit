@@ -120,6 +120,150 @@ struct CastStatusMessageProcessorTests {
         #expect(await stateStore.snapshot() == .init())
     }
 
+    @Test("receiver status without applications clears current app transport routing")
+    func receiverStatusWithoutApplicationsClearsRouting() async throws {
+        let transport = RecordingCommandTransport()
+        let dispatcher = CastCommandDispatcher(transport: transport)
+        let mediaController = CastMediaController(dispatcher: dispatcher)
+        let stateStore = CastSessionStateStore()
+        let processor = CastStatusMessageProcessor(
+            stateStore: stateStore,
+            dispatcher: dispatcher,
+            mediaController: mediaController
+        )
+
+        _ = try await processor.apply(
+            .init(
+                route: .init(sourceID: "receiver-0", destinationID: "sender-0", namespace: .receiver),
+                payloadUTF8: #"""
+                {"type":"RECEIVER_STATUS","status":{"volume":{"level":0.5,"muted":false},"applications":[{"appId":"CC1AD845","displayName":"Default Media Receiver","transportId":"web-42"}]}}
+                """#
+            )
+        )
+        _ = try await mediaController.getStatus()
+        #expect(
+            try JSONDecoder().decode(
+                [String: JSONValue].self,
+                from: Data(#require(await transport.commands().last).payloadUTF8.utf8)
+            )["type"] == .string("GET_STATUS")
+        )
+
+        let handled = try await processor.apply(
+            .init(
+                route: .init(sourceID: "receiver-0", destinationID: "sender-0", namespace: .receiver),
+                payloadUTF8: #"{"type":"RECEIVER_STATUS","status":{"volume":{"level":0.2,"muted":true},"applications":[]}}"#
+            )
+        )
+        #expect(handled)
+
+        let receiverStatus = try #require(await stateStore.receiverStatus())
+        #expect(receiverStatus.app == nil)
+        #expect(receiverStatus.volume.muted)
+
+        await #expect(throws: CastError.self) {
+            _ = try await mediaController.getStatus()
+        }
+    }
+
+    @Test("receiver status missing volume level clears receiver status and routing")
+    func receiverStatusMissingVolumeLevelClearsState() async throws {
+        let transport = RecordingCommandTransport()
+        let dispatcher = CastCommandDispatcher(transport: transport)
+        let mediaController = CastMediaController(dispatcher: dispatcher)
+        let stateStore = CastSessionStateStore()
+        let processor = CastStatusMessageProcessor(
+            stateStore: stateStore,
+            dispatcher: dispatcher,
+            mediaController: mediaController
+        )
+
+        _ = try await processor.apply(
+            .init(
+                route: .init(sourceID: "receiver-0", destinationID: "sender-0", namespace: .receiver),
+                payloadUTF8: #"""
+                {"type":"RECEIVER_STATUS","status":{"volume":{"level":0.5,"muted":false},"applications":[{"appId":"CC1AD845","displayName":"Default Media Receiver","transportId":"web-42"}]}}
+                """#
+            )
+        )
+
+        let handled = try await processor.apply(
+            .init(
+                route: .init(sourceID: "receiver-0", destinationID: "sender-0", namespace: .receiver),
+                payloadUTF8: #"{"type":"RECEIVER_STATUS","status":{"volume":{"muted":false}}}"#
+            )
+        )
+
+        #expect(handled)
+        #expect(await stateStore.receiverStatus() == nil)
+        await #expect(throws: CastError.self) {
+            _ = try await mediaController.getStatus()
+        }
+    }
+
+    @Test("empty media status array clears media state and media session id")
+    func emptyMediaStatusClearsMediaState() async throws {
+        let transport = RecordingCommandTransport()
+        let dispatcher = CastCommandDispatcher(transport: transport)
+        let mediaController = CastMediaController(dispatcher: dispatcher)
+        let stateStore = CastSessionStateStore()
+        let processor = CastStatusMessageProcessor(
+            stateStore: stateStore,
+            dispatcher: dispatcher,
+            mediaController: mediaController
+        )
+
+        await dispatcher.setCurrentApplicationTransportID("web-42")
+
+        _ = try await processor.apply(
+            .init(
+                route: .init(sourceID: "web-42", destinationID: "sender-0", namespace: .media),
+                payloadUTF8: #"{"type":"MEDIA_STATUS","status":[{"mediaSessionId":55,"playerState":"PAUSED","currentTime":1.5,"volume":{"level":1,"muted":false}}]}"#
+            )
+        )
+        #expect(await (stateStore.mediaStatus())?.mediaSessionID == 55)
+
+        let handled = try await processor.apply(
+            .init(
+                route: .init(sourceID: "web-42", destinationID: "sender-0", namespace: .media),
+                payloadUTF8: #"{"type":"MEDIA_STATUS","status":[]}"#
+            )
+        )
+
+        #expect(handled)
+        #expect(await stateStore.mediaStatus() == nil)
+        await #expect(throws: CastError.self) {
+            _ = try await mediaController.play()
+        }
+    }
+
+    @Test("media status with unknown metadata type remains handled and omits metadata")
+    func mediaStatusUnknownMetadataType() async throws {
+        let transport = RecordingCommandTransport()
+        let dispatcher = CastCommandDispatcher(transport: transport)
+        let mediaController = CastMediaController(dispatcher: dispatcher)
+        let stateStore = CastSessionStateStore()
+        let processor = CastStatusMessageProcessor(
+            stateStore: stateStore,
+            dispatcher: dispatcher,
+            mediaController: mediaController
+        )
+
+        let handled = try await processor.apply(
+            .init(
+                route: .init(sourceID: "web-42", destinationID: "sender-0", namespace: .media),
+                payloadUTF8: #"""
+                {"type":"MEDIA_STATUS","status":[{"mediaSessionId":88,"playerState":"PLAYING","currentTime":3,"volume":{"level":0.8,"muted":false},"media":{"contentId":"https://example.com/a.mp4","contentType":"video/mp4","streamType":"BUFFERED","metadata":{"metadataType":999,"title":"Ignored"}}}]}
+                """#
+            )
+        )
+
+        #expect(handled)
+        let status = try #require(await stateStore.mediaStatus())
+        #expect(status.mediaSessionID == 88)
+        #expect(status.metadata == nil)
+        #expect(status.contentType == "video/mp4")
+    }
+
     @Test("multizone messages update members and casting groups state")
     func multizoneMessagesUpdateState() async throws {
         let transport = RecordingCommandTransport()
