@@ -168,6 +168,13 @@ public actor CastDiscovery {
         scheduleBrowseTimeoutIfNeeded(runID: runID)
     }
 
+    /// Starts discovery only when not already running.
+    ///
+    /// This is a convenience alias that makes call sites explicit about idempotent behavior.
+    public func startIfNeeded() async throws {
+        try await start()
+    }
+
     /// Stops discovery browsing.
     public func stop() async {
         await browser.stop()
@@ -178,6 +185,12 @@ public actor CastDiscovery {
         activeBrowseRunID = nil
         stateValue = .stopped
         emit(.stopped)
+    }
+
+    /// Restarts discovery browsing and preserves the current snapshot unless browsers emit removals.
+    public func restart() async throws {
+        await stop()
+        try await start()
     }
 
     /// Clears discovered devices without stopping browsing.
@@ -223,6 +236,30 @@ public actor CastDiscovery {
     /// Removes a manually added or discovered device from the current snapshot.
     public func removeKnownDevice(id: CastDeviceID) {
         removeDiscoveredDevice(id: id)
+    }
+
+    /// Returns the first discovered device in the current snapshot, if any.
+    public func firstDevice() -> CastDeviceDescriptor? {
+        devices().first
+    }
+
+    /// Waits for the first available discovered device, returning immediately if one already exists.
+    public func waitForFirstDevice(timeout: TimeInterval? = nil) async throws -> CastDeviceDescriptor {
+        if let existing = firstDevice() {
+            return existing
+        }
+
+        let stream = events()
+        return try await waitForDeviceFromEvents(
+            stream,
+            timeout: timeout,
+            operationDescription: "discover first device"
+        ) { event in
+            guard case let .deviceUpserted(device, _) = event else {
+                return nil
+            }
+            return device
+        }
     }
 
     // MARK: Internal Initialization

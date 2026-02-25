@@ -52,6 +52,16 @@ public actor CastSession {
         try await runtime.connect()
     }
 
+    /// Establishes the Cast transport connection when the session is not already connected.
+    public func connectIfNeeded() async throws {
+        switch await runtime.connectionState() {
+        case .connected, .connecting, .reconnecting:
+            return
+        case .disconnected, .failed:
+            try await runtime.connect()
+        }
+    }
+
     /// Closes the Cast transport connection.
     public func disconnect(reason: DisconnectReason = .requested) async {
         await runtime.disconnect(reason: reason)
@@ -60,6 +70,31 @@ public actor CastSession {
     /// Reconnects the Cast transport connection.
     public func reconnect() async throws {
         try await runtime.reconnect()
+    }
+
+    /// Launches the Google Cast Default Media Receiver app.
+    @discardableResult
+    public func launchDefaultMediaReceiver() async throws -> CastRequestID {
+        try await receiver.launch(appID: .defaultMediaReceiver)
+    }
+
+    /// Launches the YouTube receiver app.
+    ///
+    /// Playback/control beyond receiver-level status requires app-specific protocol support.
+    @discardableResult
+    public func launchYouTube() async throws -> CastRequestID {
+        try await receiver.launch(appID: .youtube)
+    }
+
+    /// Requests fresh receiver/media/multizone status where available.
+    ///
+    /// Receiver status is required and throws on failure. Media and multizone refreshes are best-effort
+    /// because they depend on the active app and receiver capabilities.
+    public func refreshStatuses() async throws {
+        _ = try await receiver.getStatus()
+        _ = try? await media.getStatus()
+        _ = try? await multizone.getStatus()
+        _ = try? await multizone.getCastingGroups()
     }
 
     // MARK: Session State / Streams

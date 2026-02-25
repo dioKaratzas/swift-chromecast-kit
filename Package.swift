@@ -17,9 +17,15 @@ let package = Package(
             targets: ["ChromecastKit"]
         ),
     ],
+    dependencies: [
+        .package(url: "https://github.com/apple/swift-protobuf.git", from: "1.35.1"),
+    ],
     targets: [
         .target(
-            name: "ChromecastKit"
+            name: "ChromecastKit",
+            dependencies: [
+                .product(name: "SwiftProtobuf", package: "swift-protobuf"),
+            ]
         ),
         .testTarget(
             name: "ChromecastKitTests",

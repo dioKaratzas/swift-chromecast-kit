@@ -104,6 +104,19 @@ struct CastDiscoveryTests {
         #expect(await events.next() == .stopped)
     }
 
+    @Test("restart stops then starts discovery")
+    func restart() async throws {
+        let browser = RecordingDiscoveryBrowser()
+        let discovery = CastDiscovery(browser: browser)
+
+        try await discovery.start()
+        try await discovery.restart()
+
+        #expect(await discovery.state() == .running)
+        #expect(await browser.startCount() == 2)
+        #expect(await browser.stopCount() == 1)
+    }
+
     @Test("browse timeout auto-stops discovery")
     func browseTimeoutStopsDiscovery() async throws {
         let browser = RecordingDiscoveryBrowser()
@@ -195,6 +208,26 @@ struct CastDiscoveryTests {
         await #expect(throws: CastError.self) {
             try await discovery.waitForDevice(id: "missing-device", timeout: 0.01)
         }
+    }
+
+    @Test("waitForFirstDevice returns existing or first arriving device")
+    func waitForFirstDevice() async throws {
+        let browser = RecordingDiscoveryBrowser()
+        let discovery = CastDiscovery(browser: browser)
+
+        await discovery.upsertDiscoveredDevice(
+            .init(id: "living-room", friendlyName: "Living Room", host: "192.168.1.22")
+        )
+        let existing = try await discovery.waitForFirstDevice(timeout: 0.1)
+        #expect(existing.id == "living-room")
+
+        let discovery2 = CastDiscovery(browser: RecordingDiscoveryBrowser())
+        let waiter = Task { try await discovery2.waitForFirstDevice(timeout: 1) }
+        await discovery2.upsertDiscoveredDevice(
+            .init(id: "kitchen", friendlyName: "Kitchen", host: "192.168.1.23")
+        )
+        let arrived = try await waiter.value
+        #expect(arrived.id == "kitchen")
     }
 
     @Test("manual known-host helpers upsert and remove snapshot devices")

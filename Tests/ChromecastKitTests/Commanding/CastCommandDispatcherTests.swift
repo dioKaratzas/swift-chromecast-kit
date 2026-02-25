@@ -208,6 +208,44 @@ struct CastCommandDispatcherTests {
         #expect(!consumed)
     }
 
+    @Test("failAllPendingReplies resumes outstanding request waiters immediately")
+    func failAllPendingReplies() async throws {
+        let transport = RecordingCommandTransport()
+        let dispatcher = CastCommandDispatcher(transport: transport, defaultReplyTimeout: 5)
+
+        let replyTask = Task {
+            try await dispatcher.sendAndAwaitReply(
+                namespace: .receiver,
+                target: .platform,
+                payload: CastReceiverPayloadBuilder.getStatus()
+            )
+        }
+
+        for _ in 0 ..< 10 {
+            if await transport.commands().isEmpty == false {
+                break
+            }
+            await Task.yield()
+        }
+
+        await dispatcher.failAllPendingReplies(with: CastError.disconnected)
+
+        do {
+            _ = try await replyTask.value
+            Issue.record("Expected pending reply waiter to fail")
+        } catch let error as CastError {
+            #expect(error == .disconnected)
+        }
+
+        let consumed = try await dispatcher.consumeInboundMessage(
+            .init(
+                route: .init(sourceID: "receiver-0", destinationID: "sender-0", namespace: .receiver),
+                payloadUTF8: #"{"type":"RECEIVER_STATUS","requestId":1}"#
+            )
+        )
+        #expect(!consumed)
+    }
+
     @Test("sendAndAwaitReply throws mapped invalid request error replies")
     func sendAndAwaitReplyMapsErrorReplies() async throws {
         let transport = RecordingCommandTransport()

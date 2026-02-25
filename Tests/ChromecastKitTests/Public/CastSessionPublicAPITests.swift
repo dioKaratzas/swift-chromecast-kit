@@ -182,6 +182,46 @@ struct CastSessionPublicAPITests {
         await session.disconnect(reason: .requested)
     }
 
+    @Test("connectIfNeeded avoids duplicate connect when already connected")
+    func connectIfNeededIsIdempotent() async throws {
+        let transport = PublicSessionTestTransport()
+        let runtime = CastSessionRuntime(
+            device: .init(id: "device-1", friendlyName: "Living Room", host: "192.168.1.10"),
+            transport: transport,
+            configuration: .init(heartbeatInterval: 0, autoReconnect: false)
+        )
+        let session = CastSession(runtime: runtime)
+
+        try await session.connectIfNeeded()
+        try await session.connectIfNeeded()
+
+        #expect(await transport.connectCallCount() == 1)
+        await session.disconnect(reason: .requested)
+    }
+
+    @Test("launchDefaultMediaReceiver sends receiver launch with built-in app id")
+    func launchDefaultMediaReceiver() async throws {
+        let transport = PublicSessionTestTransport()
+        let runtime = CastSessionRuntime(
+            device: .init(id: "device-1", friendlyName: "Living Room", host: "192.168.1.10"),
+            transport: transport,
+            configuration: .init(heartbeatInterval: 0, autoReconnect: false)
+        )
+        let session = CastSession(runtime: runtime)
+
+        try await session.connect()
+        _ = try await session.launchDefaultMediaReceiver()
+
+        let launchCommand = try #require(await (transport.commands()).last)
+        #expect(launchCommand.route.namespace == .receiver)
+        #expect(launchCommand.route.destinationID == "receiver-0")
+        let json = try JSONDecoder().decode([String: JSONValue].self, from: Data(launchCommand.payloadUTF8.utf8))
+        #expect(json["type"] == .string("LAUNCH"))
+        #expect(json["appId"] == .string(CastAppID.defaultMediaReceiver.rawValue))
+
+        await session.disconnect(reason: .requested)
+    }
+
     private func waitForCommand(
         on transport: PublicSessionTestTransport,
         requestID: CastRequestID,
@@ -280,6 +320,10 @@ private actor PublicSessionTestTransport: CastConnectionTransport, CastCommandTr
 
     func commands() -> [CastEncodedCommand] {
         sentCommands
+    }
+
+    func connectCallCount() -> Int {
+        connectCount
     }
 
     private func removeInboundEventContinuation(id: UUID) {

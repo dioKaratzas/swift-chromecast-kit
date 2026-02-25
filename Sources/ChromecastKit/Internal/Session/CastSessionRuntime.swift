@@ -129,6 +129,7 @@ actor CastSessionRuntime {
         recoveryTask?.cancel()
         recoveryTask = nil
         connectedApplicationTransportID = nil
+        await dispatcher.failAllPendingReplies(with: CastError.disconnected)
         await connection.disconnect(reason: reason)
     }
 
@@ -447,6 +448,7 @@ actor CastSessionRuntime {
         heartbeatTask?.cancel()
         heartbeatTask = nil
         connectedApplicationTransportID = nil
+        await dispatcher.failAllPendingReplies(with: CastError.disconnected)
 
         await connection.disconnect(reason: reason)
 
@@ -544,6 +546,7 @@ actor CastSessionRuntime {
         heartbeatTask?.cancel()
         heartbeatTask = nil
         connectedApplicationTransportID = nil
+        await dispatcher.failAllPendingReplies(with: castError)
         await connection.reportRuntimeError(castError)
         await connection.disconnect(reason: .networkError)
     }
@@ -553,6 +556,7 @@ actor CastSessionRuntime {
         recoveryReason: CastConnection.DisconnectReason
     ) async {
         let castError = (error as? CastError) ?? .connectionFailed(String(describing: error))
+        await dispatcher.failAllPendingReplies(with: castError)
         await connection.reportRuntimeError(castError)
         scheduleRecoveryIfNeeded(reason: recoveryReason)
     }

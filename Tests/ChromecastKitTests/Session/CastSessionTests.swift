@@ -398,6 +398,49 @@ struct CastSessionTests {
         await session.disconnect(reason: .requested)
     }
 
+    @Test("disconnect fails pending request waiters immediately")
+    func disconnectFailsPendingRequestWaiters() async throws {
+        let transport = TestSessionTransport()
+        let device = CastDeviceDescriptor(
+            id: "device-1",
+            friendlyName: "Living Room",
+            host: "192.168.1.10",
+            port: 8009
+        )
+        let session = CastSessionRuntime(
+            device: device,
+            transport: transport,
+            configuration: .init(heartbeatInterval: 0, autoReconnect: false)
+        )
+
+        try await session.connect()
+
+        let waitTask = Task {
+            try await session.sendNamespaceMessageAndAwaitReply(
+                namespace: .receiver,
+                target: .platform,
+                payload: ["type": .string("GET_APP_AVAILABILITY"), "appId": .array([.string("CC1AD845")])],
+                timeout: 5
+            )
+        }
+
+        for _ in 0 ..< 20 {
+            if await transport.commands().count >= 3 {
+                break
+            }
+            await Task.yield()
+        }
+
+        await session.disconnect(reason: .requested)
+
+        do {
+            _ = try await waitTask.value
+            Issue.record("Expected waiter to fail on disconnect")
+        } catch let error as CastError {
+            #expect(error == .disconnected)
+        }
+    }
+
     @Test("transport closed event disconnects and auto reconnects when enabled")
     func transportClosedAutoReconnects() async throws {
         let transport = TestSessionTransport()

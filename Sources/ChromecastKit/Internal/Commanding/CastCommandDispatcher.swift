@@ -231,6 +231,20 @@ actor CastCommandDispatcher {
         pendingReply.continuation.resume(throwing: error)
     }
 
+    func failAllPendingReplies(with error: any Error) {
+        guard pendingReplies.isEmpty == false else {
+            return
+        }
+
+        let pending = pendingReplies.values
+        pendingReplies.removeAll(keepingCapacity: false)
+
+        for pendingReply in pending {
+            pendingReply.timeoutTask?.cancel()
+            pendingReply.continuation.resume(throwing: error)
+        }
+    }
+
     // MARK: Encoding / Routing
 
     private func makeEncodedCommand<Payload: Encodable & Sendable>(

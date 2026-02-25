@@ -140,6 +140,14 @@ public struct CastAppID: Sendable, Hashable, Codable, RawRepresentable, Expressi
     }
 }
 
+public extension CastAppID {
+    /// Google Cast Default Media Receiver app (`CC1AD845`).
+    static let defaultMediaReceiver: Self = "CC1AD845"
+
+    /// YouTube Cast receiver app (`233637DE`).
+    static let youtube: Self = "233637DE"
+}
+
 /// Receiver app session identifier returned by the Cast platform namespace.
 public struct CastAppSessionID: Sendable, Hashable, Codable, RawRepresentable, ExpressibleByStringLiteral {
     public let rawValue: String
