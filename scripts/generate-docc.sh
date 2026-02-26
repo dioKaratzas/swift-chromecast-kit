@@ -9,9 +9,9 @@ Usage:
   scripts/generate-docc.sh [options]
 
 Options:
-  --target <name>               Target to document (default: SubtitleKit)
+  --target <name>               Target to document (default: ChromecastKit)
   --output <path>               Output directory (default: .build/docc-site)
-  --hosting-base-path <path>    Base path for static hosting (default: swift-subtitle-kit)
+  --hosting-base-path <path>    Base path for static hosting (default: swift-chromecast-kit)
   --no-hosting-base-path        Omit --hosting-base-path
   --plugin-version <version>    swift-docc-plugin version (default: 1.4.6)
   --open                        Open generated index.html on macOS
@@ -20,14 +20,14 @@ Options:
 
 Examples:
   scripts/generate-docc.sh
-  scripts/generate-docc.sh --output docs --hosting-base-path swift-subtitle-kit
+  scripts/generate-docc.sh --output docs --hosting-base-path swift-chromecast-kit
   scripts/generate-docc.sh --no-hosting-base-path
 USAGE
 }
 
-TARGET="SubtitleKit"
+TARGET="ChromecastKit"
 OUTPUT=".build/docc-site"
-HOSTING_BASE_PATH="swift-subtitle-kit"
+HOSTING_BASE_PATH="swift-chromecast-kit"
 USE_HOSTING_BASE_PATH=1
 PLUGIN_URL="https://github.com/swiftlang/swift-docc-plugin"
 PLUGIN_VERSION="1.4.6"
@@ -92,7 +92,7 @@ fi
 mkdir -p "$(dirname "$OUTPUT_ABS")"
 rm -rf "$OUTPUT_ABS"
 
-TMP_DIR="$(mktemp -d "${TMPDIR:-/tmp}/subtitlekit-docc.XXXXXX")"
+TMP_DIR="$(mktemp -d "${TMPDIR:-/tmp}/chromecastkit-docc.XXXXXX")"
 cleanup() {
   if [[ "$KEEP_TEMP" -eq 0 ]]; then
     rm -rf "$TMP_DIR"

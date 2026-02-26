@@ -27,7 +27,7 @@ jobs:
         run: |
           scripts/generate-docc.sh \
             --output "$RUNNER_TEMP/docc-site" \
-            --hosting-base-path swift-subtitle-kit
+            --hosting-base-path swift-chromecast-kit
 
       - name: Setup Pages
         uses: actions/configure-pages@v5

@@ -1,0 +1,72 @@
+# ``ChromecastKit``
+
+Modern Swift APIs for Google Cast (Chromecast) sender apps.
+
+## Overview
+
+`ChromecastKit` provides a typed, concurrency-first Swift interface for:
+
+- discovering Cast devices on the local network
+- connecting and maintaining a Cast session
+- controlling receiver and media channels
+- managing subtitles, text tracks, and media queues
+- querying multizone/speaker-group state
+- handling custom Cast namespaces for advanced integrations
+
+The public API is intentionally split between:
+
+- simple task-oriented facades (`CastDiscovery`, `CastSession`)
+- typed domain models (`CastMediaItem`, `CastReceiverStatus`, `CastMediaStatus`, etc.)
+- advanced extensibility (`CastNamespace`, namespace events/handlers)
+
+## Topics
+
+### Essentials
+
+- <doc:Discovery-and-Sessions>
+- <doc:Media-Playback-Queues-and-Tracks>
+- ``CastDiscovery``
+- ``CastSession``
+
+### Device Discovery
+
+- <doc:Discovery-Strategies-and-Network-Notes>
+- ``CastDiscoveryConfiguration``
+- ``CastDeviceDescriptor``
+- ``CastDiscoveryEvent``
+
+### Receiver and Media Control
+
+- ``CastReceiverController``
+- ``CastMediaController``
+- ``CastMediaItem``
+- ``CastMediaStatus``
+- ``CastReceiverStatus``
+
+### Queues, Tracks, and Styling
+
+- ``CastQueueItem``
+- ``CastQueueRepeatMode``
+- ``CastTextTrack``
+- ``CastTextTrackStyle``
+
+### Multizone / Groups
+
+- <doc:Multizone-and-Groups>
+- ``CastMultizoneController``
+- ``CastMultizoneStatus``
+
+### Advanced Namespace Messaging
+
+- <doc:Custom-Namespaces-and-Handlers>
+- ``CastNamespace``
+- ``CastSession/registerNamespaceHandler(_:)``
+- ``CastSession/namespaceEvents(_:)``
+- ``CastSession/send(namespace:target:payload:)``
+
+### Operational Behavior
+
+- <doc:Runtime-Behavior-and-Error-Handling>
+- ``CastSession/Configuration``
+- ``CastError``
+
