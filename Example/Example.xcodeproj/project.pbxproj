@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		3ADB08D82F4F68500099AEFE /* ChromecastKit in Frameworks */ = {isa = PBXBuildFile; productRef = 3ADB08D72F4F68500099AEFE /* ChromecastKit */; };
+		9F0D01032F5A100000A1B2C3 /* Swifter in Frameworks */ = {isa = PBXBuildFile; productRef = 9F0D01022F5A100000A1B2C3 /* Swifter */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -28,6 +29,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				3ADB08D82F4F68500099AEFE /* ChromecastKit in Frameworks */,
+				9F0D01032F5A100000A1B2C3 /* Swifter in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -71,6 +73,7 @@
 			name = Example;
 			packageProductDependencies = (
 				3ADB08D72F4F68500099AEFE /* ChromecastKit */,
+				9F0D01022F5A100000A1B2C3 /* Swifter */,
 			);
 			productName = Example;
 			productReference = 3ADB089D2F4F66B60099AEFE /* Example.app */;
@@ -102,6 +105,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				3ADB08D62F4F68500099AEFE /* XCLocalSwiftPackageReference "../../ChromecastKit" */,
+				9F0D01012F5A100000A1B2C3 /* XCRemoteSwiftPackageReference "swifter" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 3ADB089E2F4F66B60099AEFE /* Products */;
@@ -346,10 +350,26 @@
 		};
 /* End XCLocalSwiftPackageReference section */
 
+/* Begin XCRemoteSwiftPackageReference section */
+		9F0D01012F5A100000A1B2C3 /* XCRemoteSwiftPackageReference "swifter" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/httpswift/swifter.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.5.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
 /* Begin XCSwiftPackageProductDependency section */
 		3ADB08D72F4F68500099AEFE /* ChromecastKit */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = ChromecastKit;
+		};
+		9F0D01022F5A100000A1B2C3 /* Swifter */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 9F0D01012F5A100000A1B2C3 /* XCRemoteSwiftPackageReference "swifter" */;
+			productName = Swifter;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
