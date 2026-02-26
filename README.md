@@ -11,10 +11,11 @@ A Swift package for Google Cast (Chromecast) focused on modern Swift concurrency
 - device discovery (`mDNS`/Bonjour, optional SSDP fallback)
 - Cast v2 transport/session lifecycle
 - receiver/media/multizone controllers
+- YouTube MDX quick-play and queue actions (`CastYouTubeController`)
 - subtitles/text tracks and queue APIs
 - custom namespace messaging for advanced integrations
 
-The core SDK does not host media/subtitles, and it does not implement app-specific playback protocols (for example YouTube/Plex).
+The core SDK does not host media/subtitles. App-specific protocols are opt-in controller layers (for example `CastYouTubeController` for YouTube MDX), while receiver/media/multizone controls remain concrete built-ins.
 
 ## Why ChromecastKit
 
@@ -221,6 +222,43 @@ For reusable app integrations, the SDK also exposes controller protocols:
 
 Built-in controllers (`session.receiver`, `session.media`, `session.multizone`) remain concrete and ergonomic.
 
+## YouTube (MDX Quick Play / Queue Actions)
+
+`ChromecastKit` includes a concrete `CastYouTubeController` that follows the same high-level approach as `pychromecast`:
+
+1. use the Cast YouTube MDX namespace to obtain a `screenId`
+2. use YouTube MDX web requests (lounge token + bind + queue/play actions) to start or queue videos
+
+```swift
+let youtube = CastYouTubeController()
+
+// Play immediately (replaces YouTube queue)
+try await youtube.quickPlay(
+    .init(videoID: "dQw4w9WgXcQ"),
+    in: session
+)
+
+// Or enqueue instead
+try await youtube.quickPlay(
+    .init(videoID: "BaW_jenozKc", enqueue: true),
+    in: session
+)
+```
+
+You can also refresh/read the YouTube MDX session status (`screenId`):
+
+```swift
+let status = try await youtube.refreshSessionStatus(in: session)
+print(status.screenID as Any)
+```
+
+Responsibility split (important):
+- `CastYouTubeController`: YouTube-specific MDX quick-play and queue actions
+- `session.receiver`: volume / mute / unmute (device-level)
+- `session.media`: generic play / pause / seek / rate when the active app supports `com.google.cast.media`
+
+This means a YouTube flow commonly starts with `CastYouTubeController`, then uses `session.receiver` and `session.media` for ongoing controls.
+
 ## Discovery Strategies
 
 By default, discovery uses Bonjour (`_googlecast._tcp`).
@@ -247,6 +285,7 @@ It demonstrates:
 - session connect/disconnect/reconnect
 - receiver controls
 - media load/playback/subtitles/queue commands
+- YouTube MDX quick-play / queue actions (plus guidance on receiver/media control split)
 - local file casting (app-only local HTTP hosting for demo use)
 - namespace inspection and custom messages
 - multizone status queries

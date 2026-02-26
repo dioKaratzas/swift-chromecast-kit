@@ -9,6 +9,7 @@ Modern Swift APIs for Google Cast (Chromecast) sender apps.
 - discovering Cast devices on the local network
 - connecting and maintaining a Cast session
 - controlling receiver and media channels
+- using app-specific controllers such as YouTube MDX quick play / queue actions
 - managing subtitles, text tracks, and media queues
 - querying multizone/speaker-group state
 - handling custom Cast namespaces for advanced integrations

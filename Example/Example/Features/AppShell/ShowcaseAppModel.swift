@@ -126,6 +126,7 @@ final class ShowcaseAppModel {
 
     private let discovery: CastDiscovery
     private let localFileServer = CastLocalFileServer()
+    private let youtubeController = CastYouTubeController()
 
     private var discoveryEventsTask: Task<Void, Never>?
     private var sessionConnectionEventsTask: Task<Void, Never>?
@@ -176,6 +177,13 @@ final class ShowcaseAppModel {
     var mediaSeekSecondsText = "30"
     var mediaPlaybackRateText = "1.0"
     var subtitleStylePreset = SubtitleStylePreset.none
+
+    // YouTube MDX demo
+    var youtubeVideoID = "dQw4w9WgXcQ"
+    var youtubePlaylistID = ""
+    var youtubeStartTimeText = "0"
+    var youtubeEnqueue = false
+    private(set) var youtubeSessionStatus = CastYouTubeController.SessionStatus()
 
     // Namespace console
     var namespaceFilterString = "urn:x-cast:com.example.echo"
@@ -778,6 +786,28 @@ final class ShowcaseAppModel {
         Task { await mediaApplySubtitleStyle() }
     }
 
+    // MARK: YouTube MDX Demo
+
+    func youtubeRefreshSessionStatusButtonTapped() {
+        Task { await youtubeRefreshSessionStatus() }
+    }
+
+    func youtubeQuickPlayButtonTapped() {
+        Task { await youtubeQuickPlay() }
+    }
+
+    func youtubeAddToQueueButtonTapped() {
+        Task { await youtubeAddToQueue() }
+    }
+
+    func youtubePlayNextButtonTapped() {
+        Task { await youtubePlayNext() }
+    }
+
+    func youtubeClearQueueButtonTapped() {
+        Task { await youtubeClearQueue() }
+    }
+
     // MARK: Local File Demo
 
     func localChooseVideoFileButtonTapped() {
@@ -922,6 +952,99 @@ final class ShowcaseAppModel {
         }
         await runSessionAction("Apply subtitle style") { session in
             _ = try await session.media.setTextTrackStyle(style)
+        }
+    }
+
+    private func youtubeRefreshSessionStatus() async {
+        guard let session else {
+            latestUserError = "Connect to a device first."
+            return
+        }
+
+        do {
+            let status = try await youtubeController.refreshSessionStatus(in: session, timeout: 5)
+            youtubeSessionStatus = status
+            appendSessionLog("YouTube mdxSessionStatus refreshed (screenId=\(status.screenID ?? "nil"))")
+        } catch {
+            latestUserError = errorMessage(error)
+            appendSessionLog("YouTube mdxSessionStatus failed: \(errorMessage(error))")
+        }
+    }
+
+    private func youtubeQuickPlay() async {
+        guard let session else {
+            latestUserError = "Connect to a device first."
+            return
+        }
+
+        do {
+            let request = try makeYouTubeQuickPlayRequestFromForm()
+            try await youtubeController.quickPlay(request, in: session, timeout: 10)
+            youtubeSessionStatus = await youtubeController.status()
+            appendSessionLog(request.enqueue ? "YouTube enqueue \(request.videoID)" : "YouTube quick play \(request.videoID)")
+        } catch {
+            latestUserError = errorMessage(error)
+            appendSessionLog("YouTube quick play failed: \(errorMessage(error))")
+        }
+    }
+
+    private func youtubeAddToQueue() async {
+        guard let session else {
+            latestUserError = "Connect to a device first."
+            return
+        }
+
+        let videoID = youtubeVideoID.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard videoID.isEmpty == false else {
+            latestUserError = "Enter a YouTube video ID."
+            return
+        }
+
+        do {
+            try await youtubeController.addToQueue(videoID: videoID, in: session, timeout: 10)
+            youtubeSessionStatus = await youtubeController.status()
+            appendSessionLog("YouTube add to queue \(videoID)")
+        } catch {
+            latestUserError = errorMessage(error)
+            appendSessionLog("YouTube add to queue failed: \(errorMessage(error))")
+        }
+    }
+
+    private func youtubePlayNext() async {
+        guard let session else {
+            latestUserError = "Connect to a device first."
+            return
+        }
+
+        let videoID = youtubeVideoID.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard videoID.isEmpty == false else {
+            latestUserError = "Enter a YouTube video ID."
+            return
+        }
+
+        do {
+            try await youtubeController.playNext(videoID: videoID, in: session, timeout: 10)
+            youtubeSessionStatus = await youtubeController.status()
+            appendSessionLog("YouTube play-next \(videoID)")
+        } catch {
+            latestUserError = errorMessage(error)
+            appendSessionLog("YouTube play-next failed: \(errorMessage(error))")
+        }
+    }
+
+    private func youtubeClearQueue() async {
+        guard let session else {
+            latestUserError = "Connect to a device first."
+            return
+        }
+
+        do {
+            try await youtubeController.clearQueue(in: session, timeout: 10)
+            youtubeSessionStatus = await youtubeController.status()
+            appendSessionLog("YouTube clear queue")
+        } catch {
+            latestUserError = errorMessage(error)
+            appendSessionLog("YouTube clear queue failed: \(errorMessage(error))")
         }
     }
 
@@ -1204,6 +1327,26 @@ final class ShowcaseAppModel {
             return nil
         }
         return Double(trimmed)
+    }
+
+    private func makeYouTubeQuickPlayRequestFromForm() throws -> CastYouTubeController.QuickPlayRequest {
+        let videoID = youtubeVideoID.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard videoID.isEmpty == false else {
+            throw CastError.invalidArgument("YouTube video ID is required")
+        }
+
+        let startTime = parsedDouble(youtubeStartTimeText) ?? 0
+        guard startTime.isFinite, startTime >= 0 else {
+            throw CastError.invalidArgument("YouTube start time must be a non-negative number")
+        }
+
+        let playlistID = emptyToNil(youtubePlaylistID)
+        return .init(
+            videoID: videoID,
+            playlistID: playlistID,
+            enqueue: youtubeEnqueue,
+            startTime: startTime
+        )
     }
 
     private func emptyToNil(_ text: String) -> String? {

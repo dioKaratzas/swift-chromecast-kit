@@ -439,6 +439,130 @@ struct CastSessionPublicAPITests {
         #expect(await controller.status().screenID == nil)
     }
 
+    @Test("youtube controller refreshSessionStatus captures mdx screen id")
+    func youtubeControllerRefreshSessionStatus() async throws {
+        let transport = PublicSessionTestTransport()
+        let runtime = CastSessionRuntime(
+            device: .init(id: "device-1", friendlyName: "Living Room", host: "192.168.1.10"),
+            transport: transport,
+            configuration: .init(heartbeatInterval: 0, autoReconnect: false)
+        )
+        let session = CastSession(runtime: runtime)
+        let controller = CastYouTubeController(launchPolicy: .manual)
+
+        try await session.connect()
+        await emitYouTubeReceiverReadyStatus(on: transport)
+        let ready = await waitForYouTubeReceiverReady(on: session)
+        #expect(ready)
+
+        let task = Task {
+            try await controller.refreshSessionStatus(in: session, timeout: 1)
+        }
+
+        let command = try #require(
+            await waitForCommand(on: transport, namespace: .youtubeMDX),
+            "Expected getMdxSessionStatus command"
+        )
+        let json = try JSONDecoder().decode([String: JSONValue].self, from: Data(command.payloadUTF8.utf8))
+        #expect(json["type"] == .string("getMdxSessionStatus"))
+
+        await emitYouTubeMDXSessionStatus(on: transport, screenID: "screen-123")
+
+        let status = try await task.value
+        #expect(status.screenID == "screen-123")
+        #expect(await controller.status().screenID == "screen-123")
+
+        await session.disconnect(reason: .requested)
+    }
+
+    @Test("youtube controller quickPlay uses pychromecast-style MDX web flow")
+    func youtubeControllerQuickPlayUsesMDXWebSession() async throws {
+        let transport = PublicSessionTestTransport()
+        let runtime = CastSessionRuntime(
+            device: .init(id: "device-1", friendlyName: "Living Room", host: "192.168.1.10"),
+            transport: transport,
+            configuration: .init(heartbeatInterval: 0, autoReconnect: false)
+        )
+        let session = CastSession(runtime: runtime)
+
+        let httpClient = RecordingYouTubeHTTPClient(
+            responses: [
+                .success(
+                    .init(
+                        statusCode: 200,
+                        body: Data(#"{"screens":[{"loungeToken":"LOUNGE-1"}]}"#.utf8)
+                    )
+                ),
+                .success(
+                    .init(
+                        statusCode: 200,
+                        body: Data(#"["noop",["c","SID-1",""],["S","GSESSION-1"]]"#.utf8)
+                    )
+                ),
+                .success(
+                    .init(
+                        statusCode: 200,
+                        body: Data("OK".utf8)
+                    )
+                ),
+            ]
+        )
+        let controller = CastYouTubeController(
+            launchPolicy: .manual,
+            requestTimeout: 10,
+            httpClient: httpClient
+        )
+
+        try await session.connect()
+        await emitYouTubeReceiverReadyStatus(on: transport)
+        let ready = await waitForYouTubeReceiverReady(on: session)
+        #expect(ready)
+
+        let task = Task {
+            try await controller.quickPlay(
+                .init(videoID: "dQw4w9WgXcQ"),
+                in: session,
+                timeout: 2
+            )
+        }
+
+        _ = try #require(
+            await waitForCommand(on: transport, namespace: .youtubeMDX),
+            "Expected getMdxSessionStatus command"
+        )
+        await emitYouTubeMDXSessionStatus(on: transport, screenID: "screen-abc")
+
+        try await task.value
+
+        let requests = await httpClient.requests()
+        #expect(requests.count == 3)
+
+        let loungeTokenRequest = requests[0]
+        #expect(
+            loungeTokenRequest.url.absoluteString == "https://www.youtube.com/api/lounge/pairing/get_lounge_token_batch"
+        )
+        #expect(loungeTokenRequest.form["screen_ids"] == "screen-abc")
+
+        let bindRequest = requests[1]
+        #expect(bindRequest.url.absoluteString == "https://www.youtube.com/api/lounge/bc/bind")
+        #expect(bindRequest.query.contains(.init(name: "RID", value: "0")))
+        #expect(bindRequest.query.contains(.init(name: "VER", value: "8")))
+        #expect(bindRequest.query.contains(.init(name: "CVER", value: "1")))
+        #expect(bindRequest.headers["X-YouTube-LoungeId-Token"] == "LOUNGE-1")
+
+        let setPlaylistRequest = requests[2]
+        #expect(setPlaylistRequest.url.absoluteString == "https://www.youtube.com/api/lounge/bc/bind")
+        #expect(setPlaylistRequest.query.contains(.init(name: "SID", value: "SID-1")))
+        #expect(setPlaylistRequest.query.contains(.init(name: "gsessionid", value: "GSESSION-1")))
+        #expect(setPlaylistRequest.query.contains(.init(name: "RID", value: "1")))
+        #expect(setPlaylistRequest.form["req0__sc"] == "setPlaylist")
+        #expect(setPlaylistRequest.form["req0_videoId"] == "dQw4w9WgXcQ")
+        #expect(setPlaylistRequest.form["req0_currentTime"] == "0")
+        #expect(setPlaylistRequest.form["count"] == "1")
+
+        await session.disconnect(reason: .requested)
+    }
+
     private func waitForCommand(
         on transport: PublicSessionTestTransport,
         requestID: CastRequestID,
@@ -453,6 +577,61 @@ struct CastSessionPublicAPITests {
             try? await Task.sleep(nanoseconds: 1_000_000)
         }
         return await (transport.commands()).first(where: { $0.requestID == requestID })
+    }
+
+    private func waitForCommand(
+        on transport: PublicSessionTestTransport,
+        namespace: CastNamespace,
+        timeout: TimeInterval = 0.5
+    ) async -> CastEncodedCommand? {
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            let commands = await transport.commands()
+            if let command = commands.last(where: { $0.route.namespace == namespace }) {
+                return command
+            }
+            try? await Task.sleep(nanoseconds: 1_000_000)
+        }
+        return await (transport.commands()).last(where: { $0.route.namespace == namespace })
+    }
+
+    private func emitYouTubeReceiverReadyStatus(on transport: PublicSessionTestTransport) async {
+        await transport.emitInboundEvent(
+            .utf8(
+                .init(
+                    route: .init(sourceID: "receiver-0", destinationID: "sender-0", namespace: .receiver),
+                    payloadUTF8: #"{"type":"RECEIVER_STATUS","status":{"volume":{"level":0.5,"muted":false},"applications":[{"appId":"233637DE","displayName":"YouTube","sessionId":"SESSION-1","transportId":"yt-1","namespaces":[{"name":"urn:x-cast:com.google.youtube.mdx"}]}]}}"#
+                )
+            )
+        )
+    }
+
+    private func emitYouTubeMDXSessionStatus(on transport: PublicSessionTestTransport, screenID: String) async {
+        await transport.emitInboundEvent(
+            .utf8(
+                .init(
+                    route: .init(sourceID: "yt-1", destinationID: "sender-0", namespace: .youtubeMDX),
+                    payloadUTF8: #"{"type":"mdxSessionStatus","data":{"screenId":"\#(screenID)"}}"#
+                )
+            )
+        )
+    }
+
+    private func waitForYouTubeReceiverReady(
+        on session: CastSession,
+        timeout: TimeInterval = 0.5
+    ) async -> Bool {
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            if let app = await session.receiverStatus()?.app,
+               app.appID == .youtube,
+               app.transportID != nil,
+               app.namespaces.contains(CastNamespace.youtubeMDX.rawValue) {
+                return true
+            }
+            try? await Task.sleep(nanoseconds: 1_000_000)
+        }
+        return false
     }
 
     private func extractRequestID(_ value: JSONValue) -> Int? {
@@ -640,5 +819,27 @@ private actor PublicSessionTestTransport: CastConnectionTransport, CastCommandTr
         for continuation in inboundEventContinuations.values {
             continuation.yield(reply)
         }
+    }
+}
+
+private actor RecordingYouTubeHTTPClient: CastYouTubeHTTPClient {
+    private var queuedResponses: [Result<CastYouTubeHTTPResponse, any Error>]
+    private var recordedRequests = [CastYouTubeHTTPRequest]()
+
+    init(responses: [Result<CastYouTubeHTTPResponse, any Error>]) {
+        queuedResponses = responses
+    }
+
+    func post(_ request: CastYouTubeHTTPRequest, timeout _: TimeInterval) async throws -> CastYouTubeHTTPResponse {
+        recordedRequests.append(request)
+        guard queuedResponses.isEmpty == false else {
+            throw CastError.invalidResponse("No queued fake YouTube HTTP response")
+        }
+        let next = queuedResponses.removeFirst()
+        return try next.get()
+    }
+
+    func requests() -> [CastYouTubeHTTPRequest] {
+        recordedRequests
     }
 }

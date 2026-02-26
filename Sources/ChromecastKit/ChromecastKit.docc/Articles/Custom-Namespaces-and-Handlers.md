@@ -136,9 +136,29 @@ If you need to wait for app readiness before namespace messaging, use:
 - ``CastSession/waitForApp(_:timeout:pollInterval:)``
 - ``CastSession/waitForNamespace(_:inApp:timeout:pollInterval:)``
 
-The package includes ``CastYouTubeController`` as a lightweight app-controller skeleton to show the
-intended extensibility shape, while full YouTube MDX playback protocol support remains out of scope
-for the core SDK.
+The package includes a concrete ``CastYouTubeController`` for YouTube MDX quick-play and queue
+actions. It follows the same high-level flow used by `pychromecast`:
+
+- request YouTube `mdxSessionStatus` over the Cast MDX namespace to obtain `screenId`
+- perform YouTube MDX web requests (lounge token + bind + queue/play actions)
+
+```swift
+let youtube = CastYouTubeController()
+
+try await youtube.quickPlay(
+    .init(videoID: "dQw4w9WgXcQ"),
+    in: session
+)
+
+let status = try await youtube.refreshSessionStatus(in: session)
+print(status.screenID as Any)
+```
+
+`CastYouTubeController` is intentionally focused on YouTube-specific MDX behavior. For ongoing
+device/playback controls, keep using the built-in concrete controllers:
+
+- `session.receiver` for volume and mute/unmute
+- `session.media` for play/pause/seek/rate when the active app supports the media namespace
 
 ## Notes
 

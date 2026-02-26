@@ -32,6 +32,51 @@ struct MediaPlaygroundView: View {
                     .foregroundStyle(.secondary)
             }
 
+            Section("YouTube (MDX)") {
+                Text(
+                    "Use the built-in `CastYouTubeController` for YouTube app quick-play/queue actions. Volume/mute remains receiver-level, and seek/play/pause uses the generic media controller when YouTube exposes the media namespace."
+                )
+                .foregroundStyle(.secondary)
+
+                TextField("YouTube Video ID", text: $model.youtubeVideoID)
+                    .textFieldStyle(.roundedBorder)
+                TextField("Playlist ID (optional)", text: $model.youtubePlaylistID)
+                    .textFieldStyle(.roundedBorder)
+
+                HStack {
+                    Toggle("Enqueue", isOn: $model.youtubeEnqueue)
+                    Spacer()
+                    TextField("Start Time", text: $model.youtubeStartTimeText, prompt: Text("0"))
+                        .textFieldStyle(.roundedBorder)
+                        .frame(width: 120)
+                }
+
+                HStack {
+                    Button("Refresh MDX Status") { model.youtubeRefreshSessionStatusButtonTapped() }
+                        .disabled(model.hasConnectedSession == false)
+                    Button("Quick Play / Enqueue") { model.youtubeQuickPlayButtonTapped() }
+                        .disabled(model.hasConnectedSession == false)
+                    Button("Add To Queue") { model.youtubeAddToQueueButtonTapped() }
+                        .disabled(model.hasConnectedSession == false)
+                }
+
+                HStack {
+                    Button("Play Next") { model.youtubePlayNextButtonTapped() }
+                        .disabled(model.hasConnectedSession == false)
+                    Button("Clear Queue") { model.youtubeClearQueueButtonTapped() }
+                        .disabled(model.hasConnectedSession == false)
+                }
+
+                LabeledContent("YouTube MDX Screen ID") {
+                    Text(model.youtubeSessionStatus.screenID ?? "Unknown (refresh or quick-play)")
+                        .font(.footnote.monospaced())
+                }
+
+                Text("Volume/mute: Receiver tab. Seek/play/pause: Playback Controls below (if supported by the active YouTube app build).")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
             Section("Media Source") {
                 TextField("Media URL", text: $model.mediaURLString).textFieldStyle(.roundedBorder)
                 TextField("Content Type", text: $model.mediaContentType).textFieldStyle(.roundedBorder)
