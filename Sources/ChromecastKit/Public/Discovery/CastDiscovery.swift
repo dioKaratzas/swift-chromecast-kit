@@ -406,9 +406,8 @@ public actor CastDiscovery {
         }
 
         browseTimeoutTask = Task {
-            let ns = UInt64(max(0, timeout) * 1_000_000_000)
             do {
-                try await Task.sleep(nanoseconds: ns)
+                try await CastTaskTiming.sleep(for: timeout)
             } catch is CancellationError {
                 return
             } catch {
@@ -460,7 +459,7 @@ public actor CastDiscovery {
 
             if let timeout, timeout > 0 {
                 group.addTask {
-                    try await Task.sleep(nanoseconds: UInt64(timeout * 1_000_000_000))
+                    try await CastTaskTiming.sleep(for: timeout)
                     throw CastError.timeout(operation: operationDescription)
                 }
             }

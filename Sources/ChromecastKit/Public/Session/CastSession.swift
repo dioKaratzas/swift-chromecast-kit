@@ -509,8 +509,7 @@ public actor CastSession {
                 return value
             }
 
-            let sleepNanoseconds = UInt64(max(pollInterval, 0.01) * 1_000_000_000)
-            try await Task.sleep(nanoseconds: sleepNanoseconds)
+            try await CastTaskTiming.sleep(for: pollInterval, minimum: 0.01)
         }
         try Task.checkCancellation()
         return try await condition(self)

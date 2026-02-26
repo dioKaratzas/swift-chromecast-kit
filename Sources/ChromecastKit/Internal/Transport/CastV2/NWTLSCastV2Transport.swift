@@ -214,8 +214,7 @@ actor NWTLSCastV2Transport: CastConnectionTransport, CastCommandTransport, CastI
 
                 if timeout > 0 {
                     group.addTask {
-                        let ns = UInt64(timeout * 1_000_000_000)
-                        try await Task.sleep(nanoseconds: ns)
+                        try await CastTaskTiming.sleep(for: timeout)
                         throw CastError.timeout(operation: "connect cast transport")
                     }
                 }
