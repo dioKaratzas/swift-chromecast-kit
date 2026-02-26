@@ -550,7 +550,6 @@ final class ShowcaseAppModel {
             appendSessionLog("Reconnected")
         case let .disconnected(reason):
             sessionConnectionState = .disconnected
-            localHostedMedia = nil
             appendSessionLog("Disconnected\(reason.map { " (\($0.rawValue))" } ?? "")")
         case let .error(error):
             sessionConnectionState = .failed(error)
@@ -1053,18 +1052,22 @@ final class ShowcaseAppModel {
     }
 
     private func namespaceSendTracked() async {
+        namespaceReplyText = ""
         do {
             let (namespace, target, payload) = try namespaceRequestInputs()
             await runSessionAction("Namespace send \(namespace.rawValue)") { session in
                 _ = try await session.send(namespace: namespace, target: target, payload: payload)
             }
+            namespaceReplyText = "Request sent (no reply awaited). Check observed events or use Send & Await Reply."
         } catch {
             latestUserError = errorMessage(error)
             appendSessionLog("Namespace input error: \(errorMessage(error))")
+            namespaceReplyText = "Send failed: \(errorMessage(error))"
         }
     }
 
     private func namespaceSendAndAwaitReply() async {
+        namespaceReplyText = "Waiting for reply…"
         do {
             let (namespace, target, payload) = try namespaceRequestInputs()
             guard let session else {
@@ -1081,6 +1084,7 @@ final class ShowcaseAppModel {
         } catch {
             latestUserError = errorMessage(error)
             appendSessionLog("Namespace sendAndAwaitReply failed: \(errorMessage(error))")
+            namespaceReplyText = "Request failed: \(errorMessage(error))"
         }
     }
 
@@ -1263,20 +1267,7 @@ final class ShowcaseAppModel {
         let localVideoTitle = sourceVideoURL.deletingPathExtension().lastPathComponent
         let localSubtitleName = localSubtitleFileURL?.deletingPathExtension().lastPathComponent
 
-        let textTracks: [CastTextTrack]
-        if let subtitleURL = hostedMedia.subtitleURL {
-            let trackID = parsedSubtitleTrackID() ?? 1
-            textTracks = [
-                .subtitleVTT(
-                    id: trackID,
-                    name: mediaSubtitleName.isEmpty ? "Subtitle" : mediaSubtitleName,
-                    languageCode: mediaSubtitleLanguageCode.isEmpty ? "en" : mediaSubtitleLanguageCode,
-                    url: subtitleURL
-                )
-            ]
-        } else {
-            textTracks = []
-        }
+        let textTracks = try makeTextTracksFromForm(overrideSubtitleURL: hostedMedia.subtitleURL)
         return CastMediaItem(
             contentURL: hostedMedia.videoURL,
             contentType: contentType,

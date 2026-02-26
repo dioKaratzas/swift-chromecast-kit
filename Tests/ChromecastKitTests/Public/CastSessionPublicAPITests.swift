@@ -362,6 +362,34 @@ struct CastSessionPublicAPITests {
         await session.disconnect(reason: .requested)
     }
 
+    @Test("waitForApp respects task cancellation")
+    func waitForAppCancellation() async throws {
+        let transport = PublicSessionTestTransport()
+        let runtime = CastSessionRuntime(
+            device: .init(id: "device-1", friendlyName: "Living Room", host: "192.168.1.10"),
+            transport: transport,
+            configuration: .init(heartbeatInterval: 0, autoReconnect: false)
+        )
+        let session = CastSession(runtime: runtime)
+        try await session.connect()
+
+        let task = Task {
+            try await session.waitForApp(.youtube, timeout: 5, pollInterval: 0.25)
+        }
+
+        try? await Task.sleep(nanoseconds: 50_000_000)
+        task.cancel()
+
+        do {
+            _ = try await task.value
+            #expect(Bool(false), "Expected waitForApp to throw CancellationError after task cancellation")
+        } catch {
+            #expect(error is CancellationError)
+        }
+
+        await session.disconnect(reason: .requested)
+    }
+
     @Test("connectIfNeeded avoids duplicate connect when already connected")
     func connectIfNeededIsIdempotent() async throws {
         let transport = PublicSessionTestTransport()

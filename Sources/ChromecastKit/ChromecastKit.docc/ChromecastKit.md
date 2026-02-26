@@ -60,13 +60,19 @@ The public API is intentionally split between:
 
 - <doc:Custom-Namespaces-and-Handlers>
 - ``CastNamespace``
+- ``CastSessionController``
+- ``CastAppController``
+- ``CastQuickPlayController``
+- ``CastYouTubeController``
 - ``CastSession/registerNamespaceHandler(_:)``
+- ``CastSession/registerController(_:)``
 - ``CastSession/namespaceEvents(_:)``
 - ``CastSession/send(namespace:target:payload:)``
+- ``CastSession/waitForApp(_:timeout:pollInterval:)``
+- ``CastSession/waitForNamespace(_:inApp:timeout:pollInterval:)``
 
 ### Operational Behavior
 
 - <doc:Runtime-Behavior-and-Error-Handling>
 - ``CastSession/Configuration``
 - ``CastError``
-

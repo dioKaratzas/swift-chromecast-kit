@@ -10,6 +10,7 @@ Many Cast apps use custom namespaces beyond the standard receiver/media channels
 - direct send APIs on ``CastSession``
 - inbound namespace streams (UTF-8 and binary)
 - handler registration via ``CastSessionNamespaceHandler``
+- higher-level controller protocols (``CastSessionController``, ``CastAppController``, ``CastQuickPlayController``)
 
 This is the extension point used for future app-specific controllers.
 
@@ -102,8 +103,44 @@ await session.unregisterNamespaceHandler(token)
 
 The session internally fans out matching custom namespace events to registered handlers.
 
+## App-Specific Controller Protocols
+
+For stateful app integrations (for example YouTube/Plex-style controllers), prefer the controller
+protocol layer instead of wiring streams manually in each integration.
+
+- ``CastSessionController`` adds registration/unregistration and session lifecycle callbacks.
+- ``CastAppController`` adds target app identity and launch/readiness policy.
+- ``CastQuickPlayController`` adds a strongly typed quick-play request surface.
+
+Built-in SDK controllers remain concrete (`session.receiver`, `session.media`, `session.multizone`)
+for ergonomic common usage.
+
+```swift
+actor EchoAppController: CastAppController {
+    nonisolated let namespace: CastNamespace? = "urn:x-cast:com.example.echo"
+    nonisolated let appID: CastAppID = .defaultMediaReceiver
+
+    func handle(event: CastSession.NamespaceEvent, in session: CastSession) async {
+        print("event:", event)
+    }
+}
+
+let controller = EchoAppController()
+let token = await session.registerController(controller)
+// ...
+await session.unregisterController(token)
+```
+
+If you need to wait for app readiness before namespace messaging, use:
+
+- ``CastSession/waitForApp(_:timeout:pollInterval:)``
+- ``CastSession/waitForNamespace(_:inApp:timeout:pollInterval:)``
+
+The package includes ``CastYouTubeController`` as a lightweight app-controller skeleton to show the
+intended extensibility shape, while full YouTube MDX playback protocol support remains out of scope
+for the core SDK.
+
 ## Notes
 
 - Core Cast namespaces (`receiver`, `media`, `heartbeat`, `connection`, `multizone`) are handled by the SDK runtime and are not emitted as custom namespace events.
 - App-specific protocols often require handshake/stateful logic on top of namespace messages. Build that logic in a separate controller type and keep transport details inside the session APIs.
-

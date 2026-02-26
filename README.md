@@ -14,7 +14,7 @@ A Swift package for Google Cast (Chromecast) focused on modern Swift concurrency
 - subtitles/text tracks and queue APIs
 - custom namespace messaging for advanced integrations
 
-It does not host media/subtitles or implement app-specific protocols (for example YouTube/Plex) yet.
+The core SDK does not host media/subtitles, and it does not implement app-specific playback protocols (for example YouTube/Plex).
 
 ## Why ChromecastKit
 
@@ -71,7 +71,7 @@ let session = CastSession(device: device)
 try await session.connect()
 
 try await session.launchDefaultMediaReceiver()
-try await session.refreshStatuses()
+_ = try await session.waitForApp(.defaultMediaReceiver, timeout: 6)
 ```
 
 ### 3. Load Media
@@ -136,6 +136,9 @@ Important subtitle hosting requirements:
 - URL reachable by the Chromecast device
 - CORS enabled (commonly required for text track loading)
 - avoid `localhost` unless the Chromecast can resolve/reach it
+
+The Example app includes a local-file demo (with an app-only embedded HTTP server) for local testing.
+That helper is not part of the `ChromecastKit` package API.
 
 ## Queues
 
@@ -211,6 +214,13 @@ let token = await session.registerNamespaceHandler(EchoHandler())
 await session.unregisterNamespaceHandler(token)
 ```
 
+For reusable app integrations, the SDK also exposes controller protocols:
+- `CastSessionController`
+- `CastAppController`
+- `CastQuickPlayController`
+
+Built-in controllers (`session.receiver`, `session.media`, `session.multizone`) remain concrete and ergonomic.
+
 ## Discovery Strategies
 
 By default, discovery uses Bonjour (`_googlecast._tcp`).
@@ -237,5 +247,6 @@ It demonstrates:
 - session connect/disconnect/reconnect
 - receiver controls
 - media load/playback/subtitles/queue commands
+- local file casting (app-only local HTTP hosting for demo use)
 - namespace inspection and custom messages
 - multizone status queries

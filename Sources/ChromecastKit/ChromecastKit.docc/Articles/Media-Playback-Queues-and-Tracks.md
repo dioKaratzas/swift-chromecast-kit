@@ -15,6 +15,7 @@ Use it through a connected ``CastSession``:
 let session = CastSession(device: device)
 try await session.connect()
 try await session.launchDefaultMediaReceiver()
+_ = try await session.waitForApp(.defaultMediaReceiver, timeout: 6)
 ```
 
 ## Loading Media
@@ -134,4 +135,3 @@ if let media = await session.mediaStatus() {
 - media metadata
 - text tracks / active tracks
 - queue status fields
-

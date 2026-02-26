@@ -64,9 +64,9 @@ struct NamespaceConsoleView: View {
                     }
                 }
 
-                Section("Last Reply") {
+                Section("Last Reply / Result") {
                     if model.namespaceReplyText.isEmpty {
-                        Text("No reply yet")
+                        Text("No reply or result yet")
                             .foregroundStyle(.secondary)
                     } else {
                         Text(model.namespaceReplyText)

@@ -495,13 +495,16 @@ public actor CastSession {
     ) async throws -> T? {
         let deadline = Date().addingTimeInterval(timeout)
         while Date() < deadline {
+            try Task.checkCancellation()
+
             if let value = try await condition(self) {
                 return value
             }
 
             let sleepNanoseconds = UInt64(max(pollInterval, 0.01) * 1_000_000_000)
-            try? await Task.sleep(nanoseconds: sleepNanoseconds)
+            try await Task.sleep(nanoseconds: sleepNanoseconds)
         }
+        try Task.checkCancellation()
         return try await condition(self)
     }
 }

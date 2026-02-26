@@ -17,6 +17,7 @@ struct ReceiverControlsView: View {
                     Button("Stop Current App") { model.receiverStopCurrentAppButtonTapped() }
                 }
                 .buttonStyle(.bordered)
+                .disabled(model.hasConnectedSession == false)
             }
 
             Section("Volume") {
@@ -29,12 +30,21 @@ struct ReceiverControlsView: View {
                             .frame(width: 44, alignment: .trailing)
                     }
                 }
+                .disabled(model.hasConnectedSession == false)
 
                 Toggle("Muted", isOn: $model.receiverMuted)
+                    .disabled(model.hasConnectedSession == false)
 
                 HStack {
                     Button("Apply Volume") { model.receiverApplyVolumeButtonTapped() }
                     Button(model.receiverMuted ? "Apply Mute" : "Apply Unmute") { model.receiverSetMutedButtonTapped() }
+                }
+                .disabled(model.hasConnectedSession == false)
+
+                if model.hasConnectedSession == false {
+                    Text("Connect to a device first to use receiver commands.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
             }
 
