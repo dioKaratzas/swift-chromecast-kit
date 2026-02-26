@@ -3,9 +3,11 @@
 //  Swift package for Google Cast (Chromecast).
 //
 
+import AppKit
 import Foundation
 import Observation
 import ChromecastKit
+import SystemConfiguration
 
 @MainActor
 @Observable
@@ -14,6 +16,7 @@ final class ShowcaseAppModel {
         case overview
         case receiver
         case media
+        case localFiles
         case namespace
 
         var id: Self {
@@ -25,6 +28,7 @@ final class ShowcaseAppModel {
             case .overview: "Session"
             case .receiver: "Receiver"
             case .media: "Media"
+            case .localFiles: "Local Files"
             case .namespace: "Namespaces"
             }
         }
@@ -34,6 +38,7 @@ final class ShowcaseAppModel {
             case .overview: "dot.radiowaves.left.and.right"
             case .receiver: "tv"
             case .media: "play.rectangle"
+            case .localFiles: "externaldrive"
             case .namespace: "chevron.left.forwardslash.chevron.right"
             }
         }
@@ -120,6 +125,7 @@ final class ShowcaseAppModel {
     }
 
     private let discovery: CastDiscovery
+    private let localFileServer = CastLocalFileServer()
 
     private var discoveryEventsTask: Task<Void, Never>?
     private var sessionConnectionEventsTask: Task<Void, Never>?
@@ -178,6 +184,14 @@ final class ShowcaseAppModel {
     var namespacePayloadText = "{\n  \"type\": \"PING\",\n  \"hello\": \"world\"\n}"
     var namespaceReplyText = ""
 
+    // Local file demo (Swifter-backed local hosting)
+    var localVideoFileURL: URL?
+    var localSubtitleFileURL: URL?
+    var localServerPublicHost = ""
+    var localServerPortText = "8081"
+    private(set) var localHostedMedia: CastLocalFileServer.HostedMedia?
+    private(set) var localServerIsRunning = false
+
     // Manual host fallback (when mDNS is unavailable)
     var manualHostAddress = ""
     var manualHostPortText = "8009"
@@ -208,6 +222,20 @@ final class ShowcaseAppModel {
 
     var currentApp: CastRunningApp? {
         sessionSnapshot.receiverStatus?.app
+    }
+
+    var hasConnectedSession: Bool {
+        if case .connected = sessionConnectionState {
+            return true
+        }
+        if case .reconnecting = sessionConnectionState {
+            return true
+        }
+        return false
+    }
+
+    var hasActiveMediaSession: Bool {
+        sessionSnapshot.mediaStatus?.mediaSessionID != nil
     }
 
     var showsNetflixCapabilityNote: Bool {
@@ -362,6 +390,16 @@ final class ShowcaseAppModel {
         Task { await disconnectSession() }
     }
 
+    func toggleSelectedDeviceConnectionButtonTapped() {
+        Task {
+            if connectedDeviceID == selectedDeviceID, hasConnectedSession {
+                await disconnectSession()
+            } else {
+                await connectSelectedDevice()
+            }
+        }
+    }
+
     func reconnectSessionButtonTapped() {
         Task { await reconnectSession() }
     }
@@ -512,6 +550,7 @@ final class ShowcaseAppModel {
             appendSessionLog("Reconnected")
         case let .disconnected(reason):
             sessionConnectionState = .disconnected
+            localHostedMedia = nil
             appendSessionLog("Disconnected\(reason.map { " (\($0.rawValue))" } ?? "")")
         case let .error(error):
             sessionConnectionState = .failed(error)
@@ -740,9 +779,40 @@ final class ShowcaseAppModel {
         Task { await mediaApplySubtitleStyle() }
     }
 
+    // MARK: Local File Demo
+
+    func localChooseVideoFileButtonTapped() {
+        if let url = openFilePanel(allowedExtensions: nil) {
+            localVideoFileURL = url
+        }
+    }
+
+    func localChooseSubtitleFileButtonTapped() {
+        if let url = openFilePanel(allowedExtensions: ["vtt"]) {
+            localSubtitleFileURL = url
+            Task { await localRefreshHostedSubtitleIfNeeded() }
+        }
+    }
+
+    func localClearSubtitleFileButtonTapped() {
+        localSubtitleFileURL = nil
+        Task { await localRefreshHostedSubtitleIfNeeded() }
+    }
+
+    func localStartServerButtonTapped() {
+        Task { await localStartServer() }
+    }
+
+    func localStopServerButtonTapped() {
+        Task { await localStopServer() }
+    }
+
+    func localLaunchAndLoadButtonTapped() {
+        Task { await localLaunchAndLoad() }
+    }
+
     private func mediaLaunchAndLoad() async {
-        await receiverLaunchDefaultMediaReceiver()
-        try? await Task.sleep(nanoseconds: 600_000_000)
+        await ensureDefaultMediaReceiverReadyForLoad()
         await mediaLoad()
     }
 
@@ -856,6 +926,122 @@ final class ShowcaseAppModel {
         }
     }
 
+    private func localStartServer() async {
+        do {
+            let host = try resolvedLocalServerHost()
+            let port = try resolvedLocalServerPort()
+            let baseURL = try await localFileServer.start(publicHost: host, port: port)
+            localServerIsRunning = true
+            localServerPublicHost = host
+            appendSessionLog("Local file server started at \(baseURL.absoluteString)")
+        } catch {
+            latestUserError = errorMessage(error)
+            appendSessionLog("Local server start failed: \(errorMessage(error))")
+        }
+    }
+
+    private func localStopServer() async {
+        await localFileServer.stop()
+        localServerIsRunning = false
+        localHostedMedia = nil
+        appendSessionLog("Local file server stopped")
+    }
+
+    private func localLaunchAndLoad() async {
+        guard let localVideoFileURL else {
+            latestUserError = "Choose a local video file first."
+            return
+        }
+
+        do {
+            if localServerIsRunning == false {
+                try await startLocalServerIfNeeded()
+            }
+
+            let hostedMedia = try await localFileServer.host(
+                videoFileURL: localVideoFileURL,
+                subtitleFileURL: localSubtitleFileURL
+            )
+            localHostedMedia = hostedMedia
+            localServerIsRunning = true
+            appendSessionLog("Hosted local media at \(hostedMedia.videoURL.absoluteString)")
+
+            let item = try makeLocalHostedMediaItem(from: hostedMedia, sourceVideoURL: localVideoFileURL)
+            let options = try makeMediaLoadOptionsFromForm(
+                includeSubtitleTracks: hostedMedia.subtitleURL != nil
+            )
+
+            await ensureDefaultMediaReceiverReadyForLoad()
+
+            await runSessionAction("Local media LOAD") { session in
+                _ = try await session.media.load(item, options: options)
+            }
+        } catch {
+            latestUserError = errorMessage(error)
+            appendSessionLog("Local media launch/load failed: \(errorMessage(error))")
+        }
+    }
+
+    private func localRefreshHostedSubtitleIfNeeded() async {
+        guard localServerIsRunning, localHostedMedia != nil else {
+            return
+        }
+        do {
+            let hostedMedia = try await localFileServer.updateSubtitleFile(localSubtitleFileURL)
+            localHostedMedia = hostedMedia
+            if let subtitleURL = hostedMedia.subtitleURL {
+                appendSessionLog("Updated hosted local subtitle: \(subtitleURL.absoluteString)")
+            } else {
+                appendSessionLog("Removed hosted local subtitle")
+            }
+        } catch {
+            latestUserError = errorMessage(error)
+            appendSessionLog("Local subtitle update failed: \(errorMessage(error))")
+        }
+    }
+
+    private func ensureDefaultMediaReceiverReadyForLoad() async {
+        guard let session else {
+            latestUserError = "Connect to a device first."
+            return
+        }
+
+        do {
+            _ = try await session.launchDefaultMediaReceiver()
+            appendSessionLog("Launch Default Media Receiver")
+        } catch {
+            latestUserError = errorMessage(error)
+            appendSessionLog("Launch Default Media Receiver failed: \(errorMessage(error))")
+            return
+        }
+
+        // DMR launch is asynchronous on the receiver. Poll until the receiver status reports
+        // the DMR app and an app transport ID is available, otherwise a following LOAD may race.
+        let deadline = Date().addingTimeInterval(6)
+        while Date() < deadline {
+            do {
+                try await session.refreshStatuses()
+            } catch {
+                // Receiver GET_STATUS can transiently fail during app launch; retry until timeout.
+            }
+
+            let snapshot = await session.snapshot()
+            sessionSnapshot = snapshot
+            syncReceiverControlsFromSnapshot()
+
+            if let app = snapshot.receiverStatus?.app,
+               app.appID == .defaultMediaReceiver,
+               app.transportID != nil {
+                appendSessionLog("Default Media Receiver ready")
+                return
+            }
+
+            try? await Task.sleep(nanoseconds: 250_000_000)
+        }
+
+        appendSessionLog("Default Media Receiver not confirmed ready before timeout; proceeding with LOAD")
+    }
+
     // MARK: Namespace Console
 
     func namespaceSendButtonTapped() {
@@ -934,21 +1120,7 @@ final class ShowcaseAppModel {
             images = [CastImage(url: coverURL)]
         }
 
-        var textTracks = [CastTextTrack]()
-        if mediaSubtitleURLString.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false {
-            guard let subtitleURL = URL(string: mediaSubtitleURLString), subtitleURL.scheme != nil else {
-                throw CastError.invalidArgument("Invalid subtitle URL")
-            }
-            let trackID = parsedSubtitleTrackID() ?? 1
-            textTracks = [
-                .subtitleVTT(
-                    id: trackID,
-                    name: mediaSubtitleName.isEmpty ? "Subtitle" : mediaSubtitleName,
-                    languageCode: mediaSubtitleLanguageCode.isEmpty ? "en" : mediaSubtitleLanguageCode,
-                    url: subtitleURL
-                )
-            ]
-        }
+        let textTracks = try makeTextTracksFromForm()
 
         return CastMediaItem(
             contentURL: contentURL,
@@ -961,6 +1133,12 @@ final class ShowcaseAppModel {
     }
 
     private func makeMediaLoadOptionsFromForm() throws -> CastMediaController.LoadOptions {
+        try makeMediaLoadOptionsFromForm(
+            includeSubtitleTracks: mediaSubtitleURLString.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
+        )
+    }
+
+    private func makeMediaLoadOptionsFromForm(includeSubtitleTracks: Bool) throws -> CastMediaController.LoadOptions {
         let startTime = mediaStartTimeText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             ? nil
             : parsedDouble(mediaStartTimeText)
@@ -969,7 +1147,7 @@ final class ShowcaseAppModel {
         }
 
         let activeTrackIDs: [CastMediaTrackID]
-        if mediaSubtitleURLString.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+        if includeSubtitleTracks == false {
             activeTrackIDs = []
         } else {
             activeTrackIDs = parsedSubtitleTrackID().map { [$0] } ?? [1]
@@ -1054,5 +1232,166 @@ final class ShowcaseAppModel {
             return String(describing: castError)
         }
         return String(describing: error)
+    }
+
+    private func makeTextTracksFromForm(overrideSubtitleURL: URL? = nil) throws -> [CastTextTrack] {
+        let subtitleURLString = overrideSubtitleURL?.absoluteString ?? mediaSubtitleURLString
+        if subtitleURLString.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return []
+        }
+
+        guard let subtitleURL = URL(string: subtitleURLString), subtitleURL.scheme != nil else {
+            throw CastError.invalidArgument("Invalid subtitle URL")
+        }
+
+        let trackID = parsedSubtitleTrackID() ?? 1
+        return [
+            .subtitleVTT(
+                id: trackID,
+                name: mediaSubtitleName.isEmpty ? "Subtitle" : mediaSubtitleName,
+                languageCode: mediaSubtitleLanguageCode.isEmpty ? "en" : mediaSubtitleLanguageCode,
+                url: subtitleURL
+            )
+        ]
+    }
+
+    private func makeLocalHostedMediaItem(
+        from hostedMedia: CastLocalFileServer.HostedMedia,
+        sourceVideoURL: URL
+    ) throws -> CastMediaItem {
+        let contentType = inferredMediaContentType(for: sourceVideoURL)
+        let localVideoTitle = sourceVideoURL.deletingPathExtension().lastPathComponent
+        let localSubtitleName = localSubtitleFileURL?.deletingPathExtension().lastPathComponent
+
+        let textTracks: [CastTextTrack]
+        if let subtitleURL = hostedMedia.subtitleURL {
+            let trackID = parsedSubtitleTrackID() ?? 1
+            textTracks = [
+                .subtitleVTT(
+                    id: trackID,
+                    name: mediaSubtitleName.isEmpty ? "Subtitle" : mediaSubtitleName,
+                    languageCode: mediaSubtitleLanguageCode.isEmpty ? "en" : mediaSubtitleLanguageCode,
+                    url: subtitleURL
+                )
+            ]
+        } else {
+            textTracks = []
+        }
+        return CastMediaItem(
+            contentURL: hostedMedia.videoURL,
+            contentType: contentType,
+            streamType: .buffered,
+            metadata: .generic(
+                title: localVideoTitle,
+                subtitle: localSubtitleName ?? "Local file",
+                images: []
+            ),
+            textTracks: textTracks,
+            textTrackStyle: subtitleStylePreset.castStyle
+        )
+    }
+
+    private func inferredMediaContentType(for fileURL: URL) -> String {
+        switch fileURL.pathExtension.lowercased() {
+        case "mp4", "m4v":
+            return "video/mp4"
+        case "webm":
+            return "video/webm"
+        case "mov":
+            return "video/quicktime"
+        case "mp3":
+            return "audio/mpeg"
+        case "m4a":
+            return "audio/mp4"
+        default:
+            return mediaContentType.isEmpty ? "application/octet-stream" : mediaContentType
+        }
+    }
+
+    private func startLocalServerIfNeeded() async throws {
+        if localServerIsRunning {
+            return
+        }
+        let host = try resolvedLocalServerHost()
+        let port = try resolvedLocalServerPort()
+        let baseURL = try await localFileServer.start(publicHost: host, port: port)
+        localServerPublicHost = host
+        localServerIsRunning = true
+        appendSessionLog("Local file server started at \(baseURL.absoluteString)")
+    }
+
+    private func resolvedLocalServerHost() throws -> String {
+        let typedHost = localServerPublicHost.trimmingCharacters(in: .whitespacesAndNewlines)
+        if typedHost.isEmpty == false {
+            return typedHost
+        }
+        if let detected = detectLocalIPv4Address() {
+            return detected
+        }
+        throw CastError.invalidArgument("Enter your Mac's LAN IP for local hosting")
+    }
+
+    private func resolvedLocalServerPort() throws -> UInt16 {
+        let trimmed = localServerPortText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let intPort = Int(trimmed), (1 ... 65535).contains(intPort) else {
+            throw CastError.invalidArgument("Local server port must be between 1 and 65535")
+        }
+        return UInt16(intPort)
+    }
+
+    private func openFilePanel(allowedExtensions: [String]?) -> URL? {
+        let panel = NSOpenPanel()
+        panel.allowsMultipleSelection = false
+        panel.canChooseDirectories = false
+        panel.canChooseFiles = true
+        panel.resolvesAliases = true
+        if let allowedExtensions {
+            panel.allowedFileTypes = allowedExtensions
+        }
+        return panel.runModal() == .OK ? panel.url : nil
+    }
+
+    private func detectLocalIPv4Address() -> String? {
+        var address: String?
+        var ifaddrPointer: UnsafeMutablePointer<ifaddrs>?
+        guard getifaddrs(&ifaddrPointer) == 0, let first = ifaddrPointer else {
+            return nil
+        }
+        defer { freeifaddrs(ifaddrPointer) }
+
+        var pointer: UnsafeMutablePointer<ifaddrs>? = first
+        while let current = pointer {
+            let interface = current.pointee
+            defer { pointer = interface.ifa_next }
+
+            let flags = Int32(interface.ifa_flags)
+            let isUp = (flags & IFF_UP) != 0
+            let isLoopback = (flags & IFF_LOOPBACK) != 0
+            guard isUp, isLoopback == false else {
+                continue
+            }
+            guard let addr = interface.ifa_addr, addr.pointee.sa_family == UInt8(AF_INET) else {
+                continue
+            }
+
+            var hostBuffer = [CChar](repeating: 0, count: Int(NI_MAXHOST))
+            let result = getnameinfo(
+                addr,
+                socklen_t(addr.pointee.sa_len),
+                &hostBuffer,
+                socklen_t(hostBuffer.count),
+                nil,
+                0,
+                NI_NUMERICHOST
+            )
+            if result == 0 {
+                let candidate = String(cString: hostBuffer)
+                if candidate.hasPrefix("169.254.") == false {
+                    address = candidate
+                    break
+                }
+            }
+        }
+        return address
     }
 }

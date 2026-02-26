@@ -22,7 +22,10 @@ public actor CastSession {
 
     private let runtime: CastSessionRuntime
     private var namespaceHandlers = [NamespaceHandlerToken: any CastSessionNamespaceHandler]()
+    private var registeredControllers = [NamespaceHandlerToken: any CastSessionController]()
     private var namespaceHandlerFanoutTask: Task<Void, Never>?
+    private var controllerConnectionFanoutTask: Task<Void, Never>?
+    private var controllerStateFanoutTask: Task<Void, Never>?
 
     // MARK: Initialization
 
@@ -95,6 +98,47 @@ public actor CastSession {
         _ = try? await media.getStatus()
         _ = try? await multizone.getStatus()
         _ = try? await multizone.getCastingGroups()
+    }
+
+    /// Waits until the receiver reports a specific app as active and ready (app transport connected).
+    ///
+    /// The method polls receiver status until the app is active with a non-`nil` transport ID, then
+    /// returns the reported running app. It returns `nil` on timeout.
+    public func waitForApp(
+        _ appID: CastAppID,
+        timeout: TimeInterval = 6,
+        pollInterval: TimeInterval = 0.25
+    ) async throws -> CastRunningApp? {
+        try await waitForCondition(timeout: timeout, pollInterval: pollInterval) { session in
+            _ = try? await session.receiver.getStatus()
+            guard let app = await session.receiverStatus()?.app, app.appID == appID, app.transportID != nil else {
+                return nil
+            }
+            return app
+        }
+    }
+
+    /// Waits until the active receiver app reports support for a specific namespace.
+    ///
+    /// When `appID` is provided, the active app must also match that app ID.
+    /// Returns `true` when the namespace is reported before timeout, otherwise `false`.
+    public func waitForNamespace(
+        _ namespace: CastNamespace,
+        inApp appID: CastAppID? = nil,
+        timeout: TimeInterval = 6,
+        pollInterval: TimeInterval = 0.25
+    ) async throws -> Bool {
+        let result: Bool? = try await waitForCondition(timeout: timeout, pollInterval: pollInterval) { session in
+            _ = try? await session.receiver.getStatus()
+            guard let app = await session.receiverStatus()?.app else {
+                return nil
+            }
+            if let appID, app.appID != appID {
+                return nil
+            }
+            return app.namespaces.contains(namespace.rawValue) ? true : nil
+        }
+        return result == true
     }
 
     // MARK: Session State / Streams
@@ -244,16 +288,95 @@ public actor CastSession {
         return token
     }
 
+    /// Registers a higher-level session controller with lifecycle callbacks and namespace handling.
+    ///
+    /// The controller will receive:
+    /// - custom namespace events (via `CastSessionNamespaceHandler`)
+    /// - session connection events
+    /// - session state events
+    ///
+    /// Use `unregisterController(_:)` to detach it later.
+    @discardableResult
+    public func registerController(
+        _ controller: any CastSessionController
+    ) async -> NamespaceHandlerToken {
+        let token = NamespaceHandlerToken(rawValue: UUID())
+        namespaceHandlers[token] = controller
+        registeredControllers[token] = controller
+        startNamespaceHandlerFanoutIfNeeded()
+        await startControllerFanoutIfNeeded()
+        await controller.didRegister(in: self)
+        return token
+    }
+
+    /// Registers multiple session controllers and returns their registry tokens in the same order.
+    @discardableResult
+    public func registerControllers(
+        _ controllers: [any CastSessionController]
+    ) async -> [NamespaceHandlerToken] {
+        var tokens = [NamespaceHandlerToken]()
+        tokens.reserveCapacity(controllers.count)
+        for controller in controllers {
+            let token = await registerController(controller)
+            tokens.append(token)
+        }
+        return tokens
+    }
+
     /// Unregisters a previously registered custom namespace event handler.
+    ///
+    /// If the token belongs to a controller registered with `registerController(_:)`, this also
+    /// detaches the controller and schedules its `willUnregister(from:)` callback.
+    /// Prefer `unregisterController(_:)` when you know the token is a controller token.
     public func unregisterNamespaceHandler(_ token: NamespaceHandlerToken) {
+        if let controller = registeredControllers.removeValue(forKey: token) {
+            namespaceHandlers[token] = nil
+            stopNamespaceHandlerFanoutIfNeeded()
+            stopControllerFanoutIfNeeded()
+
+            let session = self
+            Task {
+                await controller.willUnregister(from: session)
+            }
+            return
+        }
+
         namespaceHandlers[token] = nil
         stopNamespaceHandlerFanoutIfNeeded()
     }
 
-    /// Removes all registered custom namespace handlers.
+    /// Unregisters a previously registered `CastSessionController`.
+    public func unregisterController(_ token: NamespaceHandlerToken) async {
+        if let controller = registeredControllers.removeValue(forKey: token) {
+            await controller.willUnregister(from: self)
+        }
+        namespaceHandlers[token] = nil
+        stopNamespaceHandlerFanoutIfNeeded()
+        stopControllerFanoutIfNeeded()
+    }
+
+    /// Unregisters multiple previously registered session controllers.
+    public func unregisterControllers(_ tokens: [NamespaceHandlerToken]) async {
+        for token in tokens {
+            await unregisterController(token)
+        }
+    }
+
+    /// Removes all registered custom namespace handlers and session controllers.
     public func removeAllNamespaceHandlers() {
+        let controllers = Array(registeredControllers.values)
+        registeredControllers.removeAll(keepingCapacity: false)
         namespaceHandlers.removeAll(keepingCapacity: false)
         stopNamespaceHandlerFanoutIfNeeded(force: true)
+        stopControllerFanoutIfNeeded(force: true)
+        if controllers.isEmpty == false {
+            let session = self
+            Task {
+                for controller in controllers {
+                    await controller.willUnregister(from: session)
+                }
+            }
+        }
     }
 
     // MARK: Internal Initialization
@@ -291,6 +414,44 @@ public actor CastSession {
         namespaceHandlerFanoutTask = nil
     }
 
+    private func startControllerFanoutIfNeeded() async {
+        guard registeredControllers.isEmpty == false else {
+            return
+        }
+
+        if controllerConnectionFanoutTask == nil {
+            let runtime = self.runtime
+            let session = self
+            let stream = await runtime.connectionEvents()
+            controllerConnectionFanoutTask = Task {
+                for await event in stream {
+                    await session.dispatchControllerConnectionEvent(event)
+                }
+            }
+        }
+
+        if controllerStateFanoutTask == nil {
+            let runtime = self.runtime
+            let session = self
+            let stream = await runtime.stateEvents()
+            controllerStateFanoutTask = Task {
+                for await event in stream {
+                    await session.dispatchControllerStateEvent(event.publicValue)
+                }
+            }
+        }
+    }
+
+    private func stopControllerFanoutIfNeeded(force: Bool = false) {
+        guard force || registeredControllers.isEmpty else {
+            return
+        }
+        controllerConnectionFanoutTask?.cancel()
+        controllerConnectionFanoutTask = nil
+        controllerStateFanoutTask?.cancel()
+        controllerStateFanoutTask = nil
+    }
+
     private func dispatchNamespaceHandlerEvent(_ event: NamespaceEvent) async {
         guard namespaceHandlers.isEmpty == false else {
             return
@@ -303,6 +464,45 @@ public actor CastSession {
             }
             await handler.handle(event: event, in: self)
         }
+    }
+
+    private func dispatchControllerConnectionEvent(_ event: ConnectionEvent) async {
+        guard registeredControllers.isEmpty == false else {
+            return
+        }
+
+        let controllers = Array(registeredControllers.values)
+        for controller in controllers {
+            await controller.handle(connectionEvent: event, in: self)
+        }
+    }
+
+    private func dispatchControllerStateEvent(_ event: StateEvent) async {
+        guard registeredControllers.isEmpty == false else {
+            return
+        }
+
+        let controllers = Array(registeredControllers.values)
+        for controller in controllers {
+            await controller.handle(stateEvent: event, in: self)
+        }
+    }
+
+    private func waitForCondition<T: Sendable>(
+        timeout: TimeInterval,
+        pollInterval: TimeInterval,
+        condition: @escaping @Sendable (CastSession) async throws -> T?
+    ) async throws -> T? {
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            if let value = try await condition(self) {
+                return value
+            }
+
+            let sleepNanoseconds = UInt64(max(pollInterval, 0.01) * 1_000_000_000)
+            try? await Task.sleep(nanoseconds: sleepNanoseconds)
+        }
+        return try await condition(self)
     }
 }
 

@@ -12,8 +12,11 @@ struct NamespaceConsoleView: View {
         VStack(alignment: .leading, spacing: 12) {
             Form {
                 Section("Send Custom Namespace Message") {
-                    TextField("Namespace", text: $model.namespaceFilterString)
-                        .textFieldStyle(.roundedBorder)
+                    LabeledContent("Namespace") {
+                        TextField("", text: $model.namespaceFilterString, prompt: Text("urn:x-cast:..."))
+                            .labelsHidden()
+                            .textFieldStyle(.roundedBorder)
+                    }
 
                     Picker("Target", selection: $model.namespaceTargetChoice) {
                         ForEach(ShowcaseAppModel.NamespaceTargetChoice.allCases) { choice in
@@ -23,8 +26,11 @@ struct NamespaceConsoleView: View {
                     .pickerStyle(.segmented)
 
                     if model.namespaceTargetChoice == .transport {
-                        TextField("Transport ID", text: $model.namespaceTransportTargetID)
-                            .textFieldStyle(.roundedBorder)
+                        LabeledContent("Transport ID") {
+                            TextField("", text: $model.namespaceTransportTargetID, prompt: Text("transport-123"))
+                                .labelsHidden()
+                                .textFieldStyle(.roundedBorder)
+                        }
                     }
 
                     VStack(alignment: .leading, spacing: 6) {
@@ -38,7 +44,23 @@ struct NamespaceConsoleView: View {
 
                     HStack {
                         Button("Send") { model.namespaceSendButtonTapped() }
+                            .disabled(
+                                model.hasConnectedSession == false || model.namespaceFilterString.trimmingCharacters(
+                                    in: .whitespacesAndNewlines
+                                ).isEmpty
+                            )
                         Button("Send & Await Reply") { model.namespaceSendAwaitReplyButtonTapped() }
+                            .disabled(
+                                model.hasConnectedSession == false || model.namespaceFilterString.trimmingCharacters(
+                                    in: .whitespacesAndNewlines
+                                ).isEmpty
+                            )
+                    }
+
+                    if model.hasConnectedSession == false {
+                        Text("Connect to a device first to send namespace messages.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
                     }
                 }
 

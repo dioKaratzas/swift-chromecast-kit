@@ -51,6 +51,10 @@ private struct DeviceWorkspaceView: View {
                     .tabItem { Label("Media", systemImage: "play.rectangle") }
                     .tag(ShowcaseAppModel.DetailTab.media)
 
+                LocalFilesCastView(model: model)
+                    .tabItem { Label("Local Files", systemImage: "externaldrive") }
+                    .tag(ShowcaseAppModel.DetailTab.localFiles)
+
                 NamespaceConsoleView(model: model)
                     .tabItem { Label("Namespaces", systemImage: "chevron.left.forwardslash.chevron.right") }
                     .tag(ShowcaseAppModel.DetailTab.namespace)

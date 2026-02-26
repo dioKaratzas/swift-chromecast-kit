@@ -8,6 +8,7 @@ import ChromecastKit
 
 struct DiscoverySidebarView: View {
     @Bindable var model: ShowcaseAppModel
+    @State private var showsManualHostSheet = false
 
     var body: some View {
         List(selection: $model.selectedDeviceID) {
@@ -41,56 +42,26 @@ struct DiscoverySidebarView: View {
                 }
             }
 
-            Section("Manual Host (Fallback)") {
-                TextField("Host or IP", text: $model.manualHostAddress)
-                    .autocorrectionDisabled()
-                    .textFieldStyle(.roundedBorder)
-
-                TextField("Port", text: $model.manualHostPortText)
-                    .textFieldStyle(.roundedBorder)
-
-                TextField("Friendly Name (optional)", text: $model.manualHostFriendlyName)
-                    .textFieldStyle(.roundedBorder)
-
-                Button("Add Manual Host") {
-                    model.addManualHostButtonTapped()
-                }
-                .help("Add a known Chromecast host when Bonjour discovery is blocked on the network")
-            }
-
             Section("Connection") {
                 LabeledContent("Session") {
                     ConnectionStatePill(state: model.sessionConnectionState)
                 }
 
                 if let selected = model.selectedDevice {
-                    HStack {
-                        if model.connectedDeviceID == selected.id {
-                            Button("Reconnect") {
-                                model.reconnectSessionButtonTapped()
-                            }
-                            .help("Reconnect the session to the selected device")
-
-                            Button("Disconnect") {
-                                model.disconnectSessionButtonTapped()
-                            }
-                            .keyboardShortcut(.cancelAction)
-                            .help("Disconnect the current session")
-                        } else {
-                            Button("Connect") {
-                                model.connectSelectedDeviceButtonTapped()
-                            }
-                            .disabled(model.canConnectSelectedDevice == false)
-                            .help("Connect to the selected device")
-
-                            if model.connectedDeviceID != nil {
-                                Button("Disconnect Current") {
-                                    model.disconnectSessionButtonTapped()
-                                }
-                                .help("Disconnect the currently connected device before switching")
-                            }
-                        }
+                    Button(
+                        model.connectedDeviceID == selected.id && model.hasConnectedSession ? "Disconnect" : "Connect"
+                    ) {
+                        model.toggleSelectedDeviceConnectionButtonTapped()
                     }
+                    .disabled(model.selectedDevice == nil || model.isBusyConnecting)
+                    .keyboardShortcut(
+                        model.connectedDeviceID == selected.id && model.hasConnectedSession ? .cancelAction : .defaultAction
+                    )
+                    .help(
+                        model.connectedDeviceID == selected.id && model.hasConnectedSession
+                            ? "Disconnect the current session"
+                            : "Connect to the selected device"
+                    )
 
                     Text("Selected: \(selected.friendlyName)")
                         .font(.caption)
@@ -154,6 +125,23 @@ struct DiscoverySidebarView: View {
                     Label("Refresh Devices", systemImage: "arrow.clockwise")
                 }
                 .help("Refresh the sidebar from the current discovery snapshot")
+
+                Button {
+                    showsManualHostSheet = true
+                } label: {
+                    Label("Add Manual Device", systemImage: "plus.circle")
+                }
+                .help("Add a known Chromecast host/IP manually")
+            }
+        }
+        .sheet(isPresented: $showsManualHostSheet) {
+            ManualHostSheet(
+                host: $model.manualHostAddress,
+                port: $model.manualHostPortText,
+                friendlyName: $model.manualHostFriendlyName
+            ) {
+                model.addManualHostButtonTapped()
+                showsManualHostSheet = false
             }
         }
         .overlay {
@@ -165,6 +153,41 @@ struct DiscoverySidebarView: View {
                 )
             }
         }
+    }
+}
+
+private struct ManualHostSheet: View {
+    @Binding var host: String
+    @Binding var port: String
+    @Binding var friendlyName: String
+    let onAdd: () -> Void
+
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Add Manual Device")
+                .font(.headline)
+            Text("Use this when discovery is blocked and you already know the Chromecast host/IP.")
+                .foregroundStyle(.secondary)
+
+            TextField("Host or IP", text: $host)
+                .textFieldStyle(.roundedBorder)
+                .autocorrectionDisabled()
+            TextField("Port", text: $port)
+                .textFieldStyle(.roundedBorder)
+            TextField("Friendly Name (optional)", text: $friendlyName)
+                .textFieldStyle(.roundedBorder)
+
+            HStack {
+                Spacer()
+                Button("Cancel") { dismiss() }
+                Button("Add") { onAdd() }
+                    .keyboardShortcut(.defaultAction)
+            }
+        }
+        .padding(16)
+        .frame(width: 420)
     }
 }
 

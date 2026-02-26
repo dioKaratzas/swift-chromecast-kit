@@ -20,8 +20,11 @@ struct MediaPlaygroundView: View {
 
                 HStack {
                     Button("Launch DMR + Load") { model.mediaLaunchAndLoadButtonTapped() }
+                        .disabled(model.hasConnectedSession == false)
                     Button("Load Into Current App") { model.mediaLoadButtonTapped() }
+                        .disabled(model.hasConnectedSession == false)
                     Button("Get Media Status") { model.mediaGetStatusButtonTapped() }
+                        .disabled(model.hasConnectedSession == false)
                 }
 
                 Text("“Load Into Current App” only works if the active app supports `com.google.cast.media`.")
@@ -64,29 +67,62 @@ struct MediaPlaygroundView: View {
 
                 HStack {
                     Button("Enable Track") { model.mediaEnableSubtitleButtonTapped() }
+                        .disabled(model.hasActiveMediaSession == false)
                     Button("Disable Tracks") { model.mediaDisableSubtitlesButtonTapped() }
+                        .disabled(model.hasActiveMediaSession == false)
                     Button("Apply Style") { model.mediaApplySubtitleStyleButtonTapped() }
+                        .disabled(model.hasActiveMediaSession == false)
+                }
+
+                if model.hasActiveMediaSession == false {
+                    Text("Load media first to enable subtitle controls.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
             }
 
             Section("Playback Controls") {
                 HStack {
                     Button("Play") { model.mediaPlayButtonTapped() }
+                        .disabled(model.hasActiveMediaSession == false)
                     Button("Pause") { model.mediaPauseButtonTapped() }
+                        .disabled(model.hasActiveMediaSession == false)
                     Button("Stop") { model.mediaStopButtonTapped() }
+                        .disabled(model.hasActiveMediaSession == false)
                     Button("Get Status") { model.mediaGetStatusButtonTapped() }
+                        .disabled(model.hasConnectedSession == false)
                 }
 
-                HStack {
-                    TextField("Seek Seconds", text: $model.mediaSeekSecondsText)
-                        .textFieldStyle(.roundedBorder)
-                        .frame(width: 140)
-                    Button("Seek") { model.mediaSeekButtonTapped() }
-                    Spacer()
-                    TextField("Playback Rate", text: $model.mediaPlaybackRateText)
-                        .textFieldStyle(.roundedBorder)
-                        .frame(width: 120)
-                    Button("Apply Rate") { model.mediaSetPlaybackRateButtonTapped() }
+                Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 12, verticalSpacing: 10) {
+                    GridRow {
+                        Text("Seek Seconds")
+                        HStack(spacing: 8) {
+                            TextField("", text: $model.mediaSeekSecondsText, prompt: Text("30"))
+                                .labelsHidden()
+                                .textFieldStyle(.roundedBorder)
+                                .frame(width: 140)
+                            Button("Seek") { model.mediaSeekButtonTapped() }
+                                .disabled(model.hasActiveMediaSession == false)
+                        }
+                    }
+
+                    GridRow {
+                        Text("Playback Rate")
+                        HStack(spacing: 8) {
+                            TextField("", text: $model.mediaPlaybackRateText, prompt: Text("1.0"))
+                                .labelsHidden()
+                                .textFieldStyle(.roundedBorder)
+                                .frame(width: 120)
+                            Button("Apply Rate") { model.mediaSetPlaybackRateButtonTapped() }
+                                .disabled(model.hasActiveMediaSession == false)
+                        }
+                    }
+                }
+
+                if model.hasActiveMediaSession == false {
+                    Text("Launch and load media first to enable playback controls.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
             }
 
@@ -102,6 +138,7 @@ struct MediaPlaygroundView: View {
                             .foregroundStyle(.secondary)
                         HStack {
                             Button("Queue Load Sample") { model.mediaQueueLoadSampleButtonTapped() }
+                                .disabled(model.hasConnectedSession == false)
                         }
                     }
                     .padding(.top, 4)

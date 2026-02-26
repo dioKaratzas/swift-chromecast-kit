@@ -182,6 +182,186 @@ struct CastSessionPublicAPITests {
         await session.disconnect(reason: .requested)
     }
 
+    @Test("session controller registry receives lifecycle and namespace events")
+    func sessionControllerRegistry() async throws {
+        let transport = PublicSessionTestTransport()
+        let runtime = CastSessionRuntime(
+            device: .init(id: "device-1", friendlyName: "Living Room", host: "192.168.1.10"),
+            transport: transport,
+            configuration: .init(heartbeatInterval: 0, autoReconnect: false)
+        )
+        let session = CastSession(runtime: runtime)
+        let controller = RecordingSessionController(namespace: "urn:x-cast:com.example.echo")
+
+        let token = await session.registerController(controller)
+        #expect(await controller.didRegisterCount() == 1)
+
+        try await session.connect()
+
+        await transport.emitInboundEvent(
+            .utf8(
+                .init(
+                    route: .init(
+                        sourceID: "web-42",
+                        destinationID: "sender-0",
+                        namespace: "urn:x-cast:com.example.echo"
+                    ),
+                    payloadUTF8: #"{"type":"PING"}"#
+                )
+            )
+        )
+
+        let namespaceCount = try #require(
+            await waitForSessionControllerValue(on: controller, keyPath: \.namespaceEventCount, atLeast: 1)
+        )
+        #expect(namespaceCount >= 1)
+
+        let connectionCount = try #require(
+            await waitForSessionControllerValue(on: controller, keyPath: \.connectionEventCount, atLeast: 1)
+        )
+        #expect(connectionCount >= 1)
+
+        let stateCount = try #require(
+            await waitForSessionControllerValue(on: controller, keyPath: \.stateEventCount, atLeast: 1)
+        )
+        #expect(stateCount >= 1)
+
+        await session.unregisterController(token)
+        #expect(await controller.willUnregisterCount() == 1)
+
+        await session.disconnect(reason: .requested)
+    }
+
+    @Test("registerControllers registers multiple controllers in order")
+    func registerControllersBatch() async {
+        let transport = PublicSessionTestTransport()
+        let runtime = CastSessionRuntime(
+            device: .init(id: "device-1", friendlyName: "Living Room", host: "192.168.1.10"),
+            transport: transport,
+            configuration: .init(heartbeatInterval: 0, autoReconnect: false)
+        )
+        let session = CastSession(runtime: runtime)
+        let first = RecordingSessionController(namespace: "urn:x-cast:com.example.one")
+        let second = RecordingSessionController(namespace: "urn:x-cast:com.example.two")
+
+        let tokens = await session.registerControllers([first, second])
+        #expect(tokens.count == 2)
+        #expect(tokens[0] != tokens[1])
+        #expect(await first.didRegisterCount() == 1)
+        #expect(await second.didRegisterCount() == 1)
+
+        await session.unregisterControllers(tokens)
+        #expect(await first.willUnregisterCount() == 1)
+        #expect(await second.willUnregisterCount() == 1)
+    }
+
+    @Test("unregisterNamespaceHandler cleans up controller token registrations")
+    func unregisterNamespaceHandlerWithControllerToken() async throws {
+        let transport = PublicSessionTestTransport()
+        let runtime = CastSessionRuntime(
+            device: .init(id: "device-1", friendlyName: "Living Room", host: "192.168.1.10"),
+            transport: transport,
+            configuration: .init(heartbeatInterval: 0, autoReconnect: false)
+        )
+        let session = CastSession(runtime: runtime)
+        let controller = RecordingSessionController(namespace: "urn:x-cast:com.example.echo")
+
+        let token = await session.registerController(controller)
+        #expect(await controller.didRegisterCount() == 1)
+
+        await session.unregisterNamespaceHandler(token)
+
+        let unregisterCount = try #require(
+            await waitForSessionControllerValue(on: controller, keyPath: \.willUnregisterCount, atLeast: 1)
+        )
+        #expect(unregisterCount == 1)
+
+        try await session.connect()
+        await transport.emitInboundEvent(
+            .utf8(
+                .init(
+                    route: .init(
+                        sourceID: "web-42",
+                        destinationID: "sender-0",
+                        namespace: "urn:x-cast:com.example.echo"
+                    ),
+                    payloadUTF8: #"{"type":"PING"}"#
+                )
+            )
+        )
+        try? await Task.sleep(nanoseconds: 50_000_000)
+
+        let counts = await controller.counts()
+        #expect(counts.namespaceEventCount == 0)
+        #expect(counts.connectionEventCount == 0)
+        #expect(counts.stateEventCount == 0)
+
+        await session.disconnect(reason: .requested)
+    }
+
+    @Test("waitForApp returns active app when receiver status reports transport ready")
+    func waitForApp() async throws {
+        let transport = PublicSessionTestTransport()
+        let runtime = CastSessionRuntime(
+            device: .init(id: "device-1", friendlyName: "Living Room", host: "192.168.1.10"),
+            transport: transport,
+            configuration: .init(heartbeatInterval: 0, autoReconnect: false)
+        )
+        let session = CastSession(runtime: runtime)
+        try await session.connect()
+
+        Task {
+            try? await Task.sleep(nanoseconds: 50_000_000)
+            await transport.emitInboundEvent(
+                .utf8(
+                    .init(
+                        route: .init(sourceID: "receiver-0", destinationID: "sender-0", namespace: .receiver),
+                        payloadUTF8: #"""
+                        {"type":"RECEIVER_STATUS","status":{"volume":{"level":0.5,"muted":false},"applications":[{"appId":"CC1AD845","displayName":"Default Media Receiver","sessionId":"SESSION-1","transportId":"web-42","namespaces":[{"name":"urn:x-cast:com.google.cast.media"}]}]}}
+                        """#
+                    )
+                )
+            )
+        }
+
+        let app = try await session.waitForApp(.defaultMediaReceiver, timeout: 1)
+        #expect(app?.appID == .defaultMediaReceiver)
+        #expect(app?.transportID == "web-42")
+
+        await session.disconnect(reason: .requested)
+    }
+
+    @Test("waitForNamespace returns true when active app reports support")
+    func waitForNamespace() async throws {
+        let transport = PublicSessionTestTransport()
+        let runtime = CastSessionRuntime(
+            device: .init(id: "device-1", friendlyName: "Living Room", host: "192.168.1.10"),
+            transport: transport,
+            configuration: .init(heartbeatInterval: 0, autoReconnect: false)
+        )
+        let session = CastSession(runtime: runtime)
+        try await session.connect()
+
+        Task {
+            try? await Task.sleep(nanoseconds: 50_000_000)
+            await transport.emitInboundEvent(
+                .utf8(
+                    .init(
+                        route: .init(sourceID: "receiver-0", destinationID: "sender-0", namespace: .receiver),
+                        payloadUTF8: #"""
+                        {"type":"RECEIVER_STATUS","status":{"volume":{"level":0.5,"muted":false},"applications":[{"appId":"233637DE","displayName":"YouTube","sessionId":"SESSION-1","transportId":"yt-1","namespaces":[{"name":"urn:x-cast:com.google.youtube.mdx"}]}]}}
+                        """#
+                    )
+                )
+            )
+        }
+
+        let supported = try await session.waitForNamespace(.youtubeMDX, inApp: .youtube, timeout: 1)
+        #expect(supported)
+
+        await session.disconnect(reason: .requested)
+    }
+
     @Test("connectIfNeeded avoids duplicate connect when already connected")
     func connectIfNeededIsIdempotent() async throws {
         let transport = PublicSessionTestTransport()
@@ -222,6 +402,15 @@ struct CastSessionPublicAPITests {
         await session.disconnect(reason: .requested)
     }
 
+    @Test("youtube controller skeleton exposes stable app-specific API")
+    func youtubeControllerSkeleton() async {
+        let controller = CastYouTubeController()
+        #expect(controller.namespace == .youtubeMDX)
+        #expect(controller.appID == .youtube)
+        #expect(controller.launchPolicy == .launchIfNeeded)
+        #expect(await controller.status().screenID == nil)
+    }
+
     private func waitForCommand(
         on transport: PublicSessionTestTransport,
         requestID: CastRequestID,
@@ -260,6 +449,25 @@ struct CastSessionPublicAPITests {
         }
         return await handler.events().count
     }
+
+    private func waitForSessionControllerValue(
+        on controller: RecordingSessionController,
+        keyPath: KeyPath<RecordingSessionController.CountsSnapshot, Int>,
+        atLeast count: Int,
+        timeout: TimeInterval = 0.75
+    ) async -> Int? {
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            let snapshot = await controller.counts()
+            let value = snapshot[keyPath: keyPath]
+            if value >= count {
+                return value
+            }
+            try? await Task.sleep(nanoseconds: 1_000_000)
+        }
+        let snapshot = await controller.counts()
+        return snapshot[keyPath: keyPath]
+    }
 }
 
 private actor RecordingNamespaceHandler: CastSessionNamespaceHandler {
@@ -276,6 +484,55 @@ private actor RecordingNamespaceHandler: CastSessionNamespaceHandler {
 
     func events() -> [CastSession.NamespaceEvent] {
         handledEvents
+    }
+}
+
+private actor RecordingSessionController: CastSessionController {
+    struct CountsSnapshot: Sendable {
+        var didRegisterCount = 0
+        var willUnregisterCount = 0
+        var namespaceEventCount = 0
+        var connectionEventCount = 0
+        var stateEventCount = 0
+    }
+
+    let namespace: CastNamespace?
+    private var countsSnapshot = CountsSnapshot()
+
+    init(namespace: CastNamespace?) {
+        self.namespace = namespace
+    }
+
+    func didRegister(in _: CastSession) async {
+        countsSnapshot.didRegisterCount += 1
+    }
+
+    func willUnregister(from _: CastSession) async {
+        countsSnapshot.willUnregisterCount += 1
+    }
+
+    func handle(event _: CastSession.NamespaceEvent, in _: CastSession) async {
+        countsSnapshot.namespaceEventCount += 1
+    }
+
+    func handle(connectionEvent _: CastSession.ConnectionEvent, in _: CastSession) async {
+        countsSnapshot.connectionEventCount += 1
+    }
+
+    func handle(stateEvent _: CastSession.StateEvent, in _: CastSession) async {
+        countsSnapshot.stateEventCount += 1
+    }
+
+    func counts() -> CountsSnapshot {
+        countsSnapshot
+    }
+
+    func didRegisterCount() -> Int {
+        countsSnapshot.didRegisterCount
+    }
+
+    func willUnregisterCount() -> Int {
+        countsSnapshot.willUnregisterCount
     }
 }
 

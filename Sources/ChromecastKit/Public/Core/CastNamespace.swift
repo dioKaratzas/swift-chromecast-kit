@@ -34,6 +34,8 @@ public struct CastNamespace: RawRepresentable, ExpressibleByStringLiteral, Senda
     public static let media = Self("urn:x-cast:com.google.cast.media")
     /// Cast multizone namespace used by speaker groups.
     public static let multizone = Self("urn:x-cast:com.google.cast.multizone")
+    /// YouTube MDX namespace (app-specific).
+    public static let youtubeMDX = Self("urn:x-cast:com.google.youtube.mdx")
 }
 
 extension CastNamespace {
