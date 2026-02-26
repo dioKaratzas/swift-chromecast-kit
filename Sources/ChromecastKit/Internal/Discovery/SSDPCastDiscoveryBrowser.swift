@@ -18,7 +18,7 @@ actor SSDPCastDiscoveryBrowser: CastDiscoveryBrowser {
 
     private let callbackQueue = DispatchQueue(label: "ChromecastKit.Discovery.SSDP")
 
-    private var configuration = CastDiscoveryConfiguration()
+    private var configuration = CastDiscovery.Configuration()
     private var connection: NWConnection?
     private var isRunning = false
     private var eventContinuations = [UUID: AsyncStream<CastDiscoveryBrowserEvent>.Continuation]()
@@ -38,7 +38,7 @@ actor SSDPCastDiscoveryBrowser: CastDiscoveryBrowser {
         }
     }
 
-    func start(configuration: CastDiscoveryConfiguration) async throws {
+    func start(configuration: CastDiscovery.Configuration) async throws {
         guard isRunning == false else {
             return
         }

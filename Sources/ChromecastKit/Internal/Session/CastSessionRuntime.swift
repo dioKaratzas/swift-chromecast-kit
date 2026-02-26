@@ -372,7 +372,13 @@ actor CastSessionRuntime {
         heartbeatTask = Task {
             while Task.isCancelled == false {
                 let ns = UInt64(max(0, interval) * 1_000_000_000)
-                try? await Task.sleep(nanoseconds: ns)
+                do {
+                    try await Task.sleep(nanoseconds: ns)
+                } catch is CancellationError {
+                    break
+                } catch {
+                    break
+                }
                 guard !Task.isCancelled else {
                     break
                 }

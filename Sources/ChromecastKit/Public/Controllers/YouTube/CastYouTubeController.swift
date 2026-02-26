@@ -75,13 +75,9 @@ public actor CastYouTubeController: CastAppController, CastQuickPlayController {
     /// the app is ready according to `launchPolicy`.
     @discardableResult
     public func requestSessionStatus(in session: CastSession) async throws -> CastRequestID {
-        guard try await ensureAppReady(in: session) else {
-            throw CastError.unsupportedFeature("YouTube app is not ready for MDX messaging")
-        }
-        return try await session.send(
-            namespace: .youtubeMDX,
-            target: .currentApplication,
-            payload: ["type": .string("getMdxSessionStatus")]
+        try await send(
+            payload: ["type": .string("getMdxSessionStatus")],
+            in: session
         )
     }
 

@@ -269,7 +269,7 @@ private struct DeviceSidebarRow: View {
 }
 
 private struct DiscoveryStateLabel: View {
-    let state: CastDiscoveryState
+    let state: CastDiscovery.State
 
     var body: some View {
         Label(title, systemImage: image)

@@ -13,28 +13,28 @@ import Foundation
 public actor CastDiscovery {
     // MARK: Public State
 
-    public let configuration: CastDiscoveryConfiguration
+    public let configuration: CastDiscovery.Configuration
 
     // MARK: Private State
 
     private let browser: any CastDiscoveryBrowser
-    private var stateValue = CastDiscoveryState.stopped
+    private var stateValue = CastDiscovery.State.stopped
     private var devicesByID = [CastDeviceID: CastDeviceDescriptor]()
-    private var eventContinuations = [UUID: AsyncStream<CastDiscoveryEvent>.Continuation]()
+    private var eventContinuations = [UUID: AsyncStream<CastDiscovery.Event>.Continuation]()
     private var browserEventsTask: Task<Void, Never>?
     private var browseTimeoutTask: Task<Void, Never>?
     private var activeBrowseRunID: UUID?
 
     // MARK: Public Initialization
 
-    public init(configuration: CastDiscoveryConfiguration = .init()) {
+    public init(configuration: CastDiscovery.Configuration = .init()) {
         self.init(configuration: configuration, browser: CompositeCastDiscoveryBrowser())
     }
 
     // MARK: Public API
 
     /// Current discovery runtime state.
-    public func state() -> CastDiscoveryState {
+    public func state() -> CastDiscovery.State {
         stateValue
     }
 
@@ -69,7 +69,7 @@ public actor CastDiscovery {
     }
 
     /// Subscribes to discovery lifecycle and device change events.
-    public func events() -> AsyncStream<CastDiscoveryEvent> {
+    public func events() -> AsyncStream<CastDiscovery.Event> {
         let id = UUID()
 
         return AsyncStream { continuation in
@@ -265,7 +265,7 @@ public actor CastDiscovery {
     // MARK: Internal Initialization
 
     init(
-        configuration: CastDiscoveryConfiguration = .init(),
+        configuration: CastDiscovery.Configuration = .init(),
         browser: any CastDiscoveryBrowser
     ) {
         self.configuration = configuration
@@ -308,7 +308,7 @@ public actor CastDiscovery {
 
     // MARK: Private Helpers
 
-    private func emit(_ event: CastDiscoveryEvent) {
+    private func emit(_ event: CastDiscovery.Event) {
         for continuation in eventContinuations.values {
             continuation.yield(event)
         }
@@ -407,7 +407,13 @@ public actor CastDiscovery {
 
         browseTimeoutTask = Task {
             let ns = UInt64(max(0, timeout) * 1_000_000_000)
-            try? await Task.sleep(nanoseconds: ns)
+            do {
+                try await Task.sleep(nanoseconds: ns)
+            } catch is CancellationError {
+                return
+            } catch {
+                return
+            }
             guard !Task.isCancelled else {
                 return
             }
@@ -437,10 +443,10 @@ public actor CastDiscovery {
     }
 
     private func waitForDeviceFromEvents(
-        _ stream: AsyncStream<CastDiscoveryEvent>,
+        _ stream: AsyncStream<CastDiscovery.Event>,
         timeout: TimeInterval?,
         operationDescription: String,
-        matcher: @escaping @Sendable (CastDiscoveryEvent) -> CastDeviceDescriptor?
+        matcher: @escaping @Sendable (CastDiscovery.Event) -> CastDeviceDescriptor?
     ) async throws -> CastDeviceDescriptor {
         try await withThrowingTaskGroup(of: CastDeviceDescriptor.self) { group in
             group.addTask {

@@ -133,11 +133,7 @@ public actor CastMediaController {
     /// Requests media status from the active media transport.
     @discardableResult
     public func getStatus() async throws -> CastRequestID {
-        try await dispatcher.send(
-            namespace: .media,
-            target: .currentApplication,
-            payload: CastMediaPayloadBuilder.getStatus()
-        )
+        try await sendMediaCommand(CastMediaPayloadBuilder.getStatus())
     }
 
     /// Loads media into the active media receiver/app transport.
@@ -146,10 +142,8 @@ public actor CastMediaController {
         _ item: CastMediaItem,
         options: LoadOptions = .init()
     ) async throws -> CastRequestID {
-        try await dispatcher.send(
-            namespace: .media,
-            target: .currentApplication,
-            payload: CastMediaPayloadBuilder.load(
+        try await sendMediaCommand(
+            CastMediaPayloadBuilder.load(
                 item: item,
                 options: .init(
                     autoplay: options.autoplay,
@@ -167,10 +161,8 @@ public actor CastMediaController {
         items: [CastQueueItem],
         options: QueueLoadOptions = .init()
     ) async throws -> CastRequestID {
-        try await dispatcher.send(
-            namespace: .media,
-            target: .currentApplication,
-            payload: CastMediaPayloadBuilder.queueLoad(
+        try await sendMediaCommand(
+            CastMediaPayloadBuilder.queueLoad(
                 items: items,
                 options: .init(
                     startIndex: options.startIndex,
@@ -187,11 +179,7 @@ public actor CastMediaController {
     /// This sends a platform `SET_VOLUME` request on the receiver namespace.
     @discardableResult
     public func setVolume(level: Double) async throws -> CastRequestID {
-        try await dispatcher.send(
-            namespace: .receiver,
-            target: .platform,
-            payload: CastReceiverPayloadBuilder.setVolume(level: level)
-        )
+        try await sendReceiverPlatformCommand(CastReceiverPayloadBuilder.setVolume(level: level))
     }
 
     /// Convenience receiver-level mute control while working in the media workflow.
@@ -199,77 +187,47 @@ public actor CastMediaController {
     /// This sends a platform `SET_VOLUME` request with the `muted` field.
     @discardableResult
     public func setMuted(_ muted: Bool) async throws -> CastRequestID {
-        try await dispatcher.send(
-            namespace: .receiver,
-            target: .platform,
-            payload: CastReceiverPayloadBuilder.setMuted(muted)
-        )
+        try await sendReceiverPlatformCommand(CastReceiverPayloadBuilder.setMuted(muted))
     }
 
     /// Enables a text track by Cast track ID.
     @discardableResult
     public func enableTextTrack(id: CastMediaTrackID) async throws -> CastRequestID {
-        let mediaSessionID = try requireMediaSessionID()
-        return try await dispatcher.send(
-            namespace: .media,
-            target: .currentApplication,
-            payload: CastMediaPayloadBuilder.enableTextTrack(trackID: id, mediaSessionID: mediaSessionID)
-        )
+        try await sendMediaSessionCommand { mediaSessionID in
+            CastMediaPayloadBuilder.enableTextTrack(trackID: id, mediaSessionID: mediaSessionID)
+        }
     }
 
     /// Disables all active text tracks.
     @discardableResult
     public func disableTextTracks() async throws -> CastRequestID {
-        let mediaSessionID = try requireMediaSessionID()
-        return try await dispatcher.send(
-            namespace: .media,
-            target: .currentApplication,
-            payload: CastMediaPayloadBuilder.disableTextTracks(mediaSessionID: mediaSessionID)
-        )
+        try await sendMediaSessionCommand(CastMediaPayloadBuilder.disableTextTracks(mediaSessionID:))
     }
 
     /// Updates text track styling for the current media session.
     @discardableResult
     public func setTextTrackStyle(_ style: CastTextTrackStyle) async throws -> CastRequestID {
-        let mediaSessionID = try requireMediaSessionID()
-        return try await dispatcher.send(
-            namespace: .media,
-            target: .currentApplication,
-            payload: CastMediaPayloadBuilder.textTrackStyle(style, mediaSessionID: mediaSessionID)
-        )
+        try await sendMediaSessionCommand { mediaSessionID in
+            CastMediaPayloadBuilder.textTrackStyle(style, mediaSessionID: mediaSessionID)
+        }
     }
 
     /// Sends a `PLAY` command for the current media session.
     @discardableResult
     public func play() async throws -> CastRequestID {
-        let mediaSessionID = try requireMediaSessionID()
-        return try await dispatcher.send(
-            namespace: .media,
-            target: .currentApplication,
-            payload: CastMediaPayloadBuilder.play(mediaSessionID: mediaSessionID)
-        )
+        try await sendMediaSessionCommand(CastMediaPayloadBuilder.play(mediaSessionID:))
     }
 
     /// Sends a `PAUSE` command for the current media session.
     @discardableResult
     public func pause() async throws -> CastRequestID {
-        let mediaSessionID = try requireMediaSessionID()
-        return try await dispatcher.send(
-            namespace: .media,
-            target: .currentApplication,
-            payload: CastMediaPayloadBuilder.pause(mediaSessionID: mediaSessionID)
-        )
+        try await sendMediaSessionCommand(CastMediaPayloadBuilder.pause(mediaSessionID:))
     }
 
     /// Sends a `STOP` command for the current media session.
     @discardableResult
     public func stop() async throws -> CastRequestID {
-        let mediaSessionID = try requireMediaSessionID()
-        return try await dispatcher.send(
-            namespace: .media,
-            target: .currentApplication,
-            payload: CastMediaPayloadBuilder.stop(mediaSessionID: mediaSessionID)
-        )
+        try await sendMediaSessionCommand(CastMediaPayloadBuilder.stop(mediaSessionID:))
     }
 
     /// Sends a `SEEK` command for the current media session.
@@ -278,23 +236,17 @@ public actor CastMediaController {
         to time: TimeInterval,
         resume: Bool? = nil
     ) async throws -> CastRequestID {
-        let mediaSessionID = try requireMediaSessionID()
-        return try await dispatcher.send(
-            namespace: .media,
-            target: .currentApplication,
-            payload: CastMediaPayloadBuilder.seek(to: time, mediaSessionID: mediaSessionID, resume: resume)
-        )
+        try await sendMediaSessionCommand { mediaSessionID in
+            CastMediaPayloadBuilder.seek(to: time, mediaSessionID: mediaSessionID, resume: resume)
+        }
     }
 
     /// Sends a `SET_PLAYBACK_RATE` command for the current media session.
     @discardableResult
     public func setPlaybackRate(_ rate: Double) async throws -> CastRequestID {
-        let mediaSessionID = try requireMediaSessionID()
-        return try await dispatcher.send(
-            namespace: .media,
-            target: .currentApplication,
-            payload: CastMediaPayloadBuilder.setPlaybackRate(rate, mediaSessionID: mediaSessionID)
-        )
+        try await sendMediaSessionCommand { mediaSessionID in
+            CastMediaPayloadBuilder.setPlaybackRate(rate, mediaSessionID: mediaSessionID)
+        }
     }
 
     /// Inserts queue items into the current media session queue.
@@ -303,11 +255,8 @@ public actor CastMediaController {
         items: [CastQueueItem],
         options: QueueInsertOptions = .init()
     ) async throws -> CastRequestID {
-        let mediaSessionID = try requireMediaSessionID()
-        return try await dispatcher.send(
-            namespace: .media,
-            target: .currentApplication,
-            payload: CastMediaPayloadBuilder.queueInsert(
+        try await sendMediaSessionCommand { mediaSessionID in
+            CastMediaPayloadBuilder.queueInsert(
                 items: items,
                 mediaSessionID: mediaSessionID,
                 options: .init(
@@ -317,7 +266,7 @@ public actor CastMediaController {
                     insertBeforeItemID: options.insertBeforeItemID
                 )
             )
-        )
+        }
     }
 
     /// Removes queue items from the current media session queue.
@@ -326,11 +275,8 @@ public actor CastMediaController {
         itemIDs: [CastQueueItemID],
         options: QueueRemoveOptions = .init()
     ) async throws -> CastRequestID {
-        let mediaSessionID = try requireMediaSessionID()
-        return try await dispatcher.send(
-            namespace: .media,
-            target: .currentApplication,
-            payload: CastMediaPayloadBuilder.queueRemove(
+        try await sendMediaSessionCommand { mediaSessionID in
+            CastMediaPayloadBuilder.queueRemove(
                 itemIDs: itemIDs,
                 mediaSessionID: mediaSessionID,
                 options: .init(
@@ -338,7 +284,7 @@ public actor CastMediaController {
                     currentTime: options.currentTime
                 )
             )
-        )
+        }
     }
 
     /// Reorders queue items in the current media session queue.
@@ -347,11 +293,8 @@ public actor CastMediaController {
         itemIDs: [CastQueueItemID],
         options: QueueReorderOptions = .init()
     ) async throws -> CastRequestID {
-        let mediaSessionID = try requireMediaSessionID()
-        return try await dispatcher.send(
-            namespace: .media,
-            target: .currentApplication,
-            payload: CastMediaPayloadBuilder.queueReorder(
+        try await sendMediaSessionCommand { mediaSessionID in
+            CastMediaPayloadBuilder.queueReorder(
                 itemIDs: itemIDs,
                 mediaSessionID: mediaSessionID,
                 options: .init(
@@ -360,7 +303,7 @@ public actor CastMediaController {
                     insertBeforeItemID: options.insertBeforeItemID
                 )
             )
-        )
+        }
     }
 
     /// Updates queue state or items in the current media session queue.
@@ -369,11 +312,8 @@ public actor CastMediaController {
         items: [CastQueueItem]? = nil,
         options: QueueUpdateOptions = .init()
     ) async throws -> CastRequestID {
-        let mediaSessionID = try requireMediaSessionID()
-        return try await dispatcher.send(
-            namespace: .media,
-            target: .currentApplication,
-            payload: CastMediaPayloadBuilder.queueUpdate(
+        try await sendMediaSessionCommand { mediaSessionID in
+            CastMediaPayloadBuilder.queueUpdate(
                 items: items,
                 mediaSessionID: mediaSessionID,
                 options: .init(
@@ -383,7 +323,7 @@ public actor CastMediaController {
                     repeatMode: options.repeatMode
                 )
             )
-        )
+        }
     }
 
     /// Advances to the next queue item in the current media session.
@@ -415,6 +355,35 @@ public actor CastMediaController {
             throw CastError.noActiveMediaSession
         }
         return mediaSessionID
+    }
+
+    @discardableResult
+    private func sendMediaCommand<Payload: Encodable & Sendable>(
+        _ payload: Payload
+    ) async throws -> CastRequestID {
+        try await dispatcher.send(
+            namespace: .media,
+            target: .currentApplication,
+            payload: payload
+        )
+    }
+
+    @discardableResult
+    private func sendReceiverPlatformCommand<Payload: Encodable & Sendable>(
+        _ payload: Payload
+    ) async throws -> CastRequestID {
+        try await dispatcher.send(
+            namespace: .receiver,
+            target: .platform,
+            payload: payload
+        )
+    }
+
+    @discardableResult
+    private func sendMediaSessionCommand<Payload: Encodable & Sendable>(
+        _ payload: (CastMediaSessionID) -> Payload
+    ) async throws -> CastRequestID {
+        try await sendMediaCommand(payload(requireMediaSessionID()))
     }
 
     // MARK: Internal Runtime Hooks

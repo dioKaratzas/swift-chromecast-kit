@@ -319,7 +319,7 @@ private actor RecordingDiscoveryBrowser: CastDiscoveryBrowser {
         }
     }
 
-    func start(configuration _: CastDiscoveryConfiguration) async throws {
+    func start(configuration _: CastDiscovery.Configuration) async throws {
         startCalls += 1
         if let startError {
             throw startError

@@ -41,7 +41,7 @@ actor CompositeCastDiscoveryBrowser: CastDiscoveryBrowser {
         }
     }
 
-    func start(configuration: CastDiscoveryConfiguration) async throws {
+    func start(configuration: CastDiscovery.Configuration) async throws {
         guard isRunning == false else {
             return
         }

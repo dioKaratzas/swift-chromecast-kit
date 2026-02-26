@@ -22,7 +22,7 @@ public actor CastSession {
 
     private let runtime: CastSessionRuntime
     private var namespaceHandlers = [NamespaceHandlerToken: any CastSessionNamespaceHandler]()
-    private var registeredControllers = [NamespaceHandlerToken: any CastSessionController]()
+    private var registeredControllers = [ControllerToken: any CastSessionController]()
     private var namespaceHandlerFanoutTask: Task<Void, Never>?
     private var controllerConnectionFanoutTask: Task<Void, Never>?
     private var controllerStateFanoutTask: Task<Void, Never>?
@@ -299,9 +299,9 @@ public actor CastSession {
     @discardableResult
     public func registerController(
         _ controller: any CastSessionController
-    ) async -> NamespaceHandlerToken {
-        let token = NamespaceHandlerToken(rawValue: UUID())
-        namespaceHandlers[token] = controller
+    ) async -> ControllerToken {
+        let token = ControllerToken(rawValue: UUID())
+        namespaceHandlers[token.namespaceHandlerToken] = controller
         registeredControllers[token] = controller
         startNamespaceHandlerFanoutIfNeeded()
         await startControllerFanoutIfNeeded()
@@ -313,8 +313,8 @@ public actor CastSession {
     @discardableResult
     public func registerControllers(
         _ controllers: [any CastSessionController]
-    ) async -> [NamespaceHandlerToken] {
-        var tokens = [NamespaceHandlerToken]()
+    ) async -> [ControllerToken] {
+        var tokens = [ControllerToken]()
         tokens.reserveCapacity(controllers.count)
         for controller in controllers {
             let token = await registerController(controller)
@@ -329,7 +329,7 @@ public actor CastSession {
     /// detaches the controller and schedules its `willUnregister(from:)` callback.
     /// Prefer `unregisterController(_:)` when you know the token is a controller token.
     public func unregisterNamespaceHandler(_ token: NamespaceHandlerToken) {
-        if let controller = registeredControllers.removeValue(forKey: token) {
+        if let controller = registeredControllers.removeValue(forKey: token.controllerToken) {
             namespaceHandlers[token] = nil
             stopNamespaceHandlerFanoutIfNeeded()
             stopControllerFanoutIfNeeded()
@@ -345,18 +345,26 @@ public actor CastSession {
         stopNamespaceHandlerFanoutIfNeeded()
     }
 
+    /// Unregisters a controller via the namespace-handler removal API.
+    ///
+    /// This preserves the same "schedule `willUnregister` and return immediately" behavior as
+    /// `unregisterNamespaceHandler(_:)` for namespace handler tokens.
+    public func unregisterNamespaceHandler(_ token: ControllerToken) {
+        unregisterNamespaceHandler(token.namespaceHandlerToken)
+    }
+
     /// Unregisters a previously registered `CastSessionController`.
-    public func unregisterController(_ token: NamespaceHandlerToken) async {
+    public func unregisterController(_ token: ControllerToken) async {
         if let controller = registeredControllers.removeValue(forKey: token) {
             await controller.willUnregister(from: self)
         }
-        namespaceHandlers[token] = nil
+        namespaceHandlers[token.namespaceHandlerToken] = nil
         stopNamespaceHandlerFanoutIfNeeded()
         stopControllerFanoutIfNeeded()
     }
 
     /// Unregisters multiple previously registered session controllers.
-    public func unregisterControllers(_ tokens: [NamespaceHandlerToken]) async {
+    public func unregisterControllers(_ tokens: [ControllerToken]) async {
         for token in tokens {
             await unregisterController(token)
         }

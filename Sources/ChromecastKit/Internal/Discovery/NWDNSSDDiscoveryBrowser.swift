@@ -17,7 +17,7 @@ actor NWDNSSDDiscoveryBrowser: CastDiscoveryBrowser {
     private let callbackQueue = DispatchQueue(label: "ChromecastKit.Discovery.NWBrowser")
 
     private var browser: NWBrowser?
-    private var configuration = CastDiscoveryConfiguration()
+    private var configuration = CastDiscovery.Configuration()
     private var eventContinuations = [UUID: AsyncStream<CastDiscoveryBrowserEvent>.Continuation]()
     private var resolutionTasks = [CastBonjourDiscoveryParser.ServiceIdentity: Task<Void, Never>]()
     private var discoveredDeviceIDsByService = [CastBonjourDiscoveryParser.ServiceIdentity: CastDeviceID]()
@@ -34,7 +34,7 @@ actor NWDNSSDDiscoveryBrowser: CastDiscoveryBrowser {
         }
     }
 
-    func start(configuration: CastDiscoveryConfiguration) async throws {
+    func start(configuration: CastDiscovery.Configuration) async throws {
         guard browser == nil else {
             return
         }

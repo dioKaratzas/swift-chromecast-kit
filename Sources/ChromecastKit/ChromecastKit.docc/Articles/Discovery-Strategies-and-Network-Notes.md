@@ -12,7 +12,7 @@ The public API hides backend implementation details behind ``CastDiscovery``.
 
 ## Discovery Configuration
 
-Use ``CastDiscoveryConfiguration`` to tune behavior:
+Use ``CastDiscovery/Configuration`` to tune behavior:
 
 ```swift
 let discovery = CastDiscovery(
@@ -69,4 +69,3 @@ For reliable subtitles:
 - prefer WebVTT (`text/vtt`)
 - enable CORS for text track resources
 - do not use `localhost` unless the Chromecast can reach that host
-

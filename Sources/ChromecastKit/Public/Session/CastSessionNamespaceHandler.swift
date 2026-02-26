@@ -79,11 +79,32 @@ public protocol CastAppController: CastSessionController {
 
     /// Desired app launch policy before sending namespace commands.
     var launchPolicy: CastAppControllerLaunchPolicy { get }
+
+    /// Default target for namespace messages emitted by this controller.
+    var messageTarget: CastSession.NamespaceTarget { get }
+
+    /// Maximum time to wait for app launch/readiness checks.
+    var appReadinessTimeout: TimeInterval { get }
+
+    /// Poll interval used during app launch/readiness checks.
+    var appReadinessPollInterval: TimeInterval { get }
 }
 
 public extension CastAppController {
     var launchPolicy: CastAppControllerLaunchPolicy {
         .launchIfNeeded
+    }
+
+    var messageTarget: CastSession.NamespaceTarget {
+        .currentApplication
+    }
+
+    var appReadinessTimeout: TimeInterval {
+        6
+    }
+
+    var appReadinessPollInterval: TimeInterval {
+        0.25
     }
 
     /// Returns `true` when the receiver reports this app as active and the app transport is ready.
@@ -114,14 +135,86 @@ public extension CastAppController {
             _ = try await session.receiver.launch(appID: appID)
         }
 
-        guard try await session.waitForApp(appID, timeout: 6) != nil else {
+        guard try await session.waitForApp(
+            appID,
+            timeout: appReadinessTimeout,
+            pollInterval: appReadinessPollInterval
+        ) != nil else {
             return false
         }
 
         guard let namespace else {
             return true
         }
-        return try await session.waitForNamespace(namespace, inApp: appID, timeout: 6)
+        return try await session.waitForNamespace(
+            namespace,
+            inApp: appID,
+            timeout: appReadinessTimeout,
+            pollInterval: appReadinessPollInterval
+        )
+    }
+
+    /// Sends a controller-scoped JSON payload on the controller namespace.
+    ///
+    /// When `ensureReady` is `true` (default), app launch/readiness is checked first according to
+    /// `launchPolicy`.
+    @discardableResult
+    func send(
+        payload: [String: JSONValue],
+        in session: CastSession,
+        ensureReady: Bool = true
+    ) async throws -> CastRequestID {
+        let namespace = try requireControllerNamespace()
+        if ensureReady {
+            guard try await ensureAppReady(in: session) else {
+                throw CastError.unsupportedNamespace("Controller namespace is not ready on the active app")
+            }
+        }
+        return try await session.send(
+            namespace: namespace,
+            target: messageTarget,
+            payload: payload
+        )
+    }
+
+    /// Sends a controller-scoped JSON payload and awaits a correlated reply.
+    func sendAndAwaitReply(
+        payload: [String: JSONValue],
+        in session: CastSession,
+        timeout: TimeInterval? = nil,
+        ensureReady: Bool = true
+    ) async throws -> CastSession.NamespaceMessage {
+        let namespace = try requireControllerNamespace()
+        if ensureReady {
+            guard try await ensureAppReady(in: session) else {
+                throw CastError.unsupportedNamespace("Controller namespace is not ready on the active app")
+            }
+        }
+        return try await session.sendAndAwaitReply(
+            namespace: namespace,
+            target: messageTarget,
+            payload: payload,
+            timeout: timeout
+        )
+    }
+
+    /// Sends an untracked controller-scoped JSON payload on the controller namespace.
+    func sendUntracked(
+        payload: [String: JSONValue],
+        in session: CastSession,
+        ensureReady: Bool = true
+    ) async throws {
+        let namespace = try requireControllerNamespace()
+        if ensureReady {
+            guard try await ensureAppReady(in: session) else {
+                throw CastError.unsupportedNamespace("Controller namespace is not ready on the active app")
+            }
+        }
+        try await session.sendUntracked(
+            namespace: namespace,
+            target: messageTarget,
+            payload: payload
+        )
     }
 
     private func isControllerReady(in session: CastSession) async -> Bool {
@@ -136,6 +229,13 @@ public extension CastAppController {
             return false
         }
         return app.namespaces.contains(namespace.rawValue)
+    }
+
+    private func requireControllerNamespace() throws -> CastNamespace {
+        guard let namespace else {
+            throw CastError.invalidArgument("CastAppController requires a namespace to send messages")
+        }
+        return namespace
     }
 }
 

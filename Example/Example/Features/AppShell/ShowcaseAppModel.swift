@@ -133,7 +133,7 @@ final class ShowcaseAppModel {
     private var sessionNamespaceEventsTask: Task<Void, Never>?
     private var autoRefreshMediaTimeTask: Task<Void, Never>?
 
-    private(set) var discoveryState = CastDiscoveryState.stopped
+    private(set) var discoveryState = CastDiscovery.State.stopped
     private(set) var devices = [CastDeviceDescriptor]()
     var selectedDeviceID: CastDeviceID?
     var selectedTab = DetailTab.overview
@@ -360,7 +360,7 @@ final class ShowcaseAppModel {
         appendDiscoveryLog("Added manual host: \(descriptor.friendlyName) @ \(descriptor.host):\(descriptor.port)")
     }
 
-    private func handleDiscoveryEvent(_ event: CastDiscoveryEvent) async {
+    private func handleDiscoveryEvent(_ event: CastDiscovery.Event) async {
         switch event {
         case .started:
             discoveryState = .running

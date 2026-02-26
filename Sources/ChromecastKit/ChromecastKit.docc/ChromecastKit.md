@@ -31,9 +31,9 @@ The public API is intentionally split between:
 ### Device Discovery
 
 - <doc:Discovery-Strategies-and-Network-Notes>
-- ``CastDiscoveryConfiguration``
+- ``CastDiscovery/Configuration``
 - ``CastDeviceDescriptor``
-- ``CastDiscoveryEvent``
+- ``CastDiscovery/Event``
 
 ### Receiver and Media Control
 

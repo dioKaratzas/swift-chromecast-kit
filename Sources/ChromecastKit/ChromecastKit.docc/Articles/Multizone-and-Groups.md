@@ -43,5 +43,4 @@ Group devices may also appear during discovery as devices with capabilities such
 - ``CastDeviceCapability/group``
 - ``CastDeviceCapability/multizone``
 
-You can include or exclude group devices through ``CastDiscoveryConfiguration/includeGroups`` depending on your UI.
-
+You can include or exclude group devices through ``CastDiscovery/Configuration/includeGroups`` depending on your UI.

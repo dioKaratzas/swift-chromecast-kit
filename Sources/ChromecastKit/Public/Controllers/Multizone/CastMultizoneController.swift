@@ -19,21 +19,13 @@ public actor CastMultizoneController {
     /// Requests current multizone group membership status.
     @discardableResult
     public func getStatus() async throws -> CastRequestID {
-        try await dispatcher.send(
-            namespace: .multizone,
-            target: .platform,
-            payload: CastMultizonePayloadBuilder.getStatus()
-        )
+        try await sendPlatformCommand(CastMultizonePayloadBuilder.getStatus())
     }
 
     /// Requests casting-groups metadata from the multizone namespace.
     @discardableResult
     public func getCastingGroups() async throws -> CastRequestID {
-        try await dispatcher.send(
-            namespace: .multizone,
-            target: .platform,
-            payload: CastMultizonePayloadBuilder.getCastingGroups()
-        )
+        try await sendPlatformCommand(CastMultizonePayloadBuilder.getCastingGroups())
     }
 
     /// Returns the latest known multizone status for this session, if any.
@@ -46,5 +38,18 @@ public actor CastMultizoneController {
     init(dispatcher: CastCommandDispatcher, stateStore: CastSessionStateStore) {
         self.dispatcher = dispatcher
         self.stateStore = stateStore
+    }
+
+    // MARK: Private Helpers
+
+    @discardableResult
+    private func sendPlatformCommand<Payload: Encodable & Sendable>(
+        _ payload: Payload
+    ) async throws -> CastRequestID {
+        try await dispatcher.send(
+            namespace: .multizone,
+            target: .platform,
+            payload: payload
+        )
     }
 }

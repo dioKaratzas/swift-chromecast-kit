@@ -5,14 +5,20 @@
 
 import Foundation
 
-/// Backward-compatible alias for the namespace handler token type.
-public typealias CastSessionNamespaceHandlerToken = CastSession.NamespaceHandlerToken
-
 public extension CastSession {
     // MARK: Public Models
 
     /// Token returned when registering a custom namespace handler on a `CastSession`.
     struct NamespaceHandlerToken: Sendable, Hashable, Codable, RawRepresentable {
+        public let rawValue: UUID
+
+        public init(rawValue: UUID) {
+            self.rawValue = rawValue
+        }
+    }
+
+    /// Token returned when registering a session controller on a ``CastSession``.
+    struct ControllerToken: Sendable, Hashable, Codable, RawRepresentable {
         public let rawValue: UUID
 
         public init(rawValue: UUID) {
@@ -211,6 +217,18 @@ extension CastSession.NamespaceTarget {
         case .platform: .platform
         case let .transport(id): .transport(id: id)
         }
+    }
+}
+
+extension CastSession.ControllerToken {
+    var namespaceHandlerToken: CastSession.NamespaceHandlerToken {
+        .init(rawValue: rawValue)
+    }
+}
+
+extension CastSession.NamespaceHandlerToken {
+    var controllerToken: CastSession.ControllerToken {
+        .init(rawValue: rawValue)
     }
 }
 

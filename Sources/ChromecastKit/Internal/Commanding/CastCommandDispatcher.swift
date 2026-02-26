@@ -197,7 +197,13 @@ actor CastCommandDispatcher {
 
         let timeoutTask = Task { [requestID = pendingReply.requestID] in
             let ns = UInt64(max(0, timeout) * 1_000_000_000)
-            try? await Task.sleep(nanoseconds: ns)
+            do {
+                try await Task.sleep(nanoseconds: ns)
+            } catch is CancellationError {
+                return
+            } catch {
+                return
+            }
             guard !Task.isCancelled else {
                 return
             }

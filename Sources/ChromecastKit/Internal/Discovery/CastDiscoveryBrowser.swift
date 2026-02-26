@@ -13,6 +13,6 @@ enum CastDiscoveryBrowserEvent: Sendable, Hashable {
 
 protocol CastDiscoveryBrowser: Sendable {
     func events() async -> AsyncStream<CastDiscoveryBrowserEvent>
-    func start(configuration: CastDiscoveryConfiguration) async throws
+    func start(configuration: CastDiscovery.Configuration) async throws
     func stop() async
 }
