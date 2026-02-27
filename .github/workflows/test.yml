@@ -9,7 +9,7 @@ on:
     branches:
       - main
     types:
-      - labeled
+      - opened
       - synchronize
       - reopened
       - ready_for_review
@@ -22,11 +22,31 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  test:
-    name: Test
-    if: github.event_name == 'workflow_dispatch' || github.event_name == 'push' || contains(github.event.pull_request.labels.*.name, 'run-ci')
+  format:
+    name: SwiftFormat
+    if: github.event_name == 'pull_request' && github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     container: swift:6.0
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Lint changed Swift files
+        run: scripts/swiftformat.sh lint-changed
+
+  test:
+    name: Test (Swift ${{ matrix.swift }})
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        swift:
+          - "6.0"
+          - "6.1"
+    container: swift:${{ matrix.swift }}
     steps:
       - name: Checkout
         uses: actions/checkout@v5

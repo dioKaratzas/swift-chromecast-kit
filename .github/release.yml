@@ -4,6 +4,9 @@ changelog:
       - skip-changelog
       - no-release-notes
       - dependencies
+    authors:
+      - github-actions[bot]
+      - dependabot[bot]
   categories:
     - title: "🚨 Breaking Changes"
       labels:
@@ -23,9 +26,16 @@ changelog:
       labels:
         - test
         - ci
+    - title: "⚡ Performance"
+      labels:
+        - perf
     - title: "📚 Documentation"
       labels:
         - docs
+    - title: "🧩 Examples"
+      labels:
+        - example
+        - examples
     - title: "🧹 Maintenance"
       labels:
         - chore

@@ -88,12 +88,12 @@ jobs:
           ## Installation
 
           \`\`\`swift
-          .package(url: "https://github.com/dioKaratzas/ChromecastKit.git", from: "${TAG#v}")
+          .package(url: "https://github.com/dioKaratzas/swift-chromecast-kit.git", from: "${TAG#v}")
           \`\`\`
 
           ## Documentation
 
-          https://diokaratzas.github.io/ChromecastKit/documentation/chromecastkit/
+          https://diokaratzas.github.io/swift-chromecast-kit/documentation/chromecastkit/
           EOF
 
       - name: Create GitHub release
