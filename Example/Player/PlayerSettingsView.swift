@@ -1,8 +1,13 @@
+//
+//  ChromecastKit
+//  Swift package for Google Cast (Chromecast).
+//
+
 import SwiftUI
 #if os(iOS)
-import UIKit
+    import UIKit
 #elseif os(macOS)
-import AppKit
+    import AppKit
 #endif
 
 struct PlayerSettingsView: View {
@@ -82,28 +87,28 @@ struct PlayerSettingsView: View {
     }
 
     private func rgbValue(from color: Color) -> PlayerModel.SubtitleRGBColor? {
-#if os(iOS)
-        let uiColor = UIColor(color)
-        var red = CGFloat.zero
-        var green = CGFloat.zero
-        var blue = CGFloat.zero
-        guard uiColor.getRed(&red, green: &green, blue: &blue, alpha: nil) else {
+        #if os(iOS)
+            let uiColor = UIColor(color)
+            var red = CGFloat.zero
+            var green = CGFloat.zero
+            var blue = CGFloat.zero
+            guard uiColor.getRed(&red, green: &green, blue: &blue, alpha: nil) else {
+                return nil
+            }
+            return .init(red: Double(red), green: Double(green), blue: Double(blue))
+        #elseif os(macOS)
+            let nsColor = NSColor(color)
+            guard let converted = nsColor.usingColorSpace(.deviceRGB) else {
+                return nil
+            }
+            return .init(
+                red: Double(converted.redComponent),
+                green: Double(converted.greenComponent),
+                blue: Double(converted.blueComponent)
+            )
+        #else
             return nil
-        }
-        return .init(red: Double(red), green: Double(green), blue: Double(blue))
-#elseif os(macOS)
-        let nsColor = NSColor(color)
-        guard let converted = nsColor.usingColorSpace(.deviceRGB) else {
-            return nil
-        }
-        return .init(
-            red: Double(converted.redComponent),
-            green: Double(converted.greenComponent),
-            blue: Double(converted.blueComponent)
-        )
-#else
-        return nil
-#endif
+        #endif
     }
 }
 

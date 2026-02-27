@@ -72,9 +72,11 @@ struct MediaPlaygroundView: View {
                         .font(.footnote.monospaced())
                 }
 
-                Text("Volume/mute: Receiver tab. Seek/play/pause: Playback Controls below (if supported by the active YouTube app build).")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                Text(
+                    "Volume/mute: Receiver tab. Seek/play/pause: Playback Controls below (if supported by the active YouTube app build)."
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
             }
 
             Section("Media Source") {

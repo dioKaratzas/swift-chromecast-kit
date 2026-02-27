@@ -1,3 +1,8 @@
+//
+//  ChromecastKit
+//  Swift package for Google Cast (Chromecast).
+//
+
 import Foundation
 
 struct SubtitleCue: Sendable, Hashable {

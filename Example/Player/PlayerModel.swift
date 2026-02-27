@@ -1,73 +1,16 @@
-import AVFoundation
-import ChromecastKit
+//
+//  ChromecastKit
+//  Swift package for Google Cast (Chromecast).
+//
+
 import Foundation
 import Observation
-import SystemConfiguration
+import AVFoundation
+import ChromecastKit
 
 @MainActor
 @Observable
 final class PlayerModel {
-    struct SubtitleTrack: Identifiable, Hashable, Sendable {
-        let id: UUID
-        let fileURL: URL
-        let displayName: String
-        let cues: [SubtitleCue]
-    }
-
-    struct SubtitleRGBColor: Hashable, Sendable {
-        var red: Double
-        var green: Double
-        var blue: Double
-
-        init(red: Double, green: Double, blue: Double) {
-            self.red = min(max(red, 0), 1)
-            self.green = min(max(green, 0), 1)
-            self.blue = min(max(blue, 0), 1)
-        }
-
-        var rgbHex: String {
-            let r = Int((red * 255).rounded())
-            let g = Int((green * 255).rounded())
-            let b = Int((blue * 255).rounded())
-            return String(format: "%02X%02X%02X", r, g, b)
-        }
-
-        static let white = SubtitleRGBColor(red: 1, green: 1, blue: 1)
-        static let black = SubtitleRGBColor(red: 0, green: 0, blue: 0)
-    }
-
-    enum SubtitleEdgeStyleOption: String, CaseIterable, Identifiable, Sendable {
-        case dropShadow
-        case outline
-        case none
-
-        var id: Self {
-            self
-        }
-
-        var title: String {
-            switch self {
-            case .dropShadow: "Drop Shadow"
-            case .outline: "Outline"
-            case .none: "None"
-            }
-        }
-
-        var castEdgeType: CastTextTrackEdgeType {
-            switch self {
-            case .dropShadow: .dropShadow
-            case .outline: .outline
-            case .none: .none
-            }
-        }
-    }
-
-    struct LogEntry: Identifiable, Hashable {
-        let id = UUID()
-        let timestamp: Date
-        let message: String
-    }
-
     private enum Constant {
         static let subtitleTrackID: CastMediaTrackID = 1
     }
@@ -322,7 +265,7 @@ final class PlayerModel {
                 handledAtLeastOne = true
                 continue
             }
-            if isPlayableMediaFile(url) {
+            if PlayerMediaFileSupport.isPlayableMediaFile(url) {
                 didPickMediaFile(url)
                 handledAtLeastOne = true
             }
@@ -948,11 +891,6 @@ final class PlayerModel {
         }
     }
 
-    private enum SeekDirection {
-        case backward
-        case forward
-    }
-
     private func parsedCastSeekDeltaSeconds() -> TimeInterval? {
         let trimmed = castSeekDeltaSecondsText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard let value = Double(trimmed), value > 0 else {
@@ -1052,7 +990,7 @@ final class PlayerModel {
             return typedHost
         }
 
-        if let detectedHost = detectLocalIPv4Address() {
+        if let detectedHost = PlayerMediaFileSupport.detectLocalIPv4Address() {
             return detectedHost
         }
 
@@ -1080,7 +1018,7 @@ final class PlayerModel {
         sourceMediaURL: URL
     ) -> CastMediaItem {
         let textTracks = makeCastTextTracks(for: hostedMedia.subtitleURL)
-        let contentType = inferredContentType(for: sourceMediaURL)
+        let contentType = PlayerMediaFileSupport.inferredContentType(for: sourceMediaURL)
         let subtitle = selectedSubtitleTrack?.displayName ?? "Local file"
 
         return CastMediaItem(
@@ -1128,82 +1066,6 @@ final class PlayerModel {
                 url: subtitleURL
             )
         ]
-    }
-
-    private func inferredContentType(for mediaURL: URL) -> String {
-        switch mediaURL.pathExtension.lowercased() {
-        case "mp4", "m4v":
-            return "video/mp4"
-        case "mov":
-            return "video/quicktime"
-        case "webm":
-            return "video/webm"
-        case "mp3":
-            return "audio/mpeg"
-        case "m4a":
-            return "audio/mp4"
-        case "aac":
-            return "audio/aac"
-        case "wav":
-            return "audio/wav"
-        default:
-            return "application/octet-stream"
-        }
-    }
-
-    private func isPlayableMediaFile(_ url: URL) -> Bool {
-        switch url.pathExtension.lowercased() {
-        case "mp4", "m4v", "mov", "webm", "mp3", "m4a", "aac", "wav":
-            return true
-        default:
-            return false
-        }
-    }
-
-    private func detectLocalIPv4Address() -> String? {
-        var ifaddrPointer: UnsafeMutablePointer<ifaddrs>?
-        guard getifaddrs(&ifaddrPointer) == 0, let first = ifaddrPointer else {
-            return nil
-        }
-        defer { freeifaddrs(ifaddrPointer) }
-
-        var pointer: UnsafeMutablePointer<ifaddrs>? = first
-        while let current = pointer {
-            let interface = current.pointee
-            pointer = interface.ifa_next
-
-            let flags = Int32(interface.ifa_flags)
-            let isUp = (flags & IFF_UP) != 0
-            let isLoopback = (flags & IFF_LOOPBACK) != 0
-            guard isUp, isLoopback == false else {
-                continue
-            }
-
-            guard let address = interface.ifa_addr,
-                  address.pointee.sa_family == UInt8(AF_INET) else {
-                continue
-            }
-
-            var hostBuffer = [CChar](repeating: 0, count: Int(NI_MAXHOST))
-            let result = getnameinfo(
-                address,
-                socklen_t(address.pointee.sa_len),
-                &hostBuffer,
-                socklen_t(hostBuffer.count),
-                nil,
-                0,
-                NI_NUMERICHOST
-            )
-
-            if result == 0 {
-                let candidate = String(cString: hostBuffer)
-                if candidate.hasPrefix("169.254.") == false {
-                    return candidate
-                }
-            }
-        }
-
-        return nil
     }
 
     private func appendLog(_ message: String) {
