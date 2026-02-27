@@ -27,8 +27,7 @@ concurrency:
 
 jobs:
   create-release:
-    runs-on: ubuntu-latest
-    container: swift:6.0
+    runs-on: macos-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -39,10 +38,12 @@ jobs:
       - name: Configure git safe directory
         run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
 
-      - name: Install GitHub CLI
+      - name: Ensure GitHub CLI
         run: |
-          apt-get update
-          apt-get install -y gh
+          if ! command -v gh >/dev/null 2>&1; then
+            brew install gh
+          fi
+          gh --version
 
       - name: Validate and run tests
         run: |

@@ -359,6 +359,56 @@ struct CastSessionPublicAPITests {
         await session.disconnect(reason: .requested)
     }
 
+    @Test("waitForNamespace returns false on timeout when namespace never appears")
+    func waitForNamespaceTimeout() async throws {
+        let transport = CastSessionTestTransport()
+        let runtime = CastSessionRuntime(
+            device: .init(id: "device-1", friendlyName: "Living Room", host: "192.168.1.10"),
+            transport: transport,
+            configuration: .init(heartbeatInterval: 0, autoReconnect: false)
+        )
+        let session = CastSession(runtime: runtime)
+        try await session.connect()
+
+        let supported = try await session.waitForNamespace(
+            .youtubeMDX,
+            inApp: .youtube,
+            timeout: 0.05,
+            pollInterval: 0.01
+        )
+        #expect(supported == false)
+
+        await session.disconnect(reason: .requested)
+    }
+
+    @Test("waitForNamespace respects task cancellation")
+    func waitForNamespaceCancellation() async throws {
+        let transport = CastSessionTestTransport()
+        let runtime = CastSessionRuntime(
+            device: .init(id: "device-1", friendlyName: "Living Room", host: "192.168.1.10"),
+            transport: transport,
+            configuration: .init(heartbeatInterval: 0, autoReconnect: false)
+        )
+        let session = CastSession(runtime: runtime)
+        try await session.connect()
+
+        let task = Task {
+            try await session.waitForNamespace(.youtubeMDX, inApp: .youtube, timeout: 5, pollInterval: 0.25)
+        }
+
+        try? await Task.sleep(nanoseconds: 50_000_000)
+        task.cancel()
+
+        do {
+            _ = try await task.value
+            #expect(Bool(false), "Expected waitForNamespace to throw CancellationError after task cancellation")
+        } catch {
+            #expect(error is CancellationError)
+        }
+
+        await session.disconnect(reason: .requested)
+    }
+
     @Test("waitForApp respects task cancellation")
     func waitForAppCancellation() async throws {
         let transport = CastSessionTestTransport()
