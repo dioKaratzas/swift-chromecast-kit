@@ -1,6 +1,7 @@
 //
 //  ChromecastKit
-//  Swift package for Google Cast (Chromecast).
+//  SPDX-License-Identifier: Apache-2.0
+//  Copyright 2026 Dionysis Karatzas
 //
 
 import SwiftUI

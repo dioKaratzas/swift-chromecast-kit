@@ -35,7 +35,7 @@
 --group-blank-lines true
 --grouped-extension "MARK: %c"
 --guard-else same-line
---header "//\n//  ChromecastKit\n//  Swift package for Google Cast (Chromecast).\n//"
+--header "//\n//  ChromecastKit\n//  SPDX-License-Identifier: Apache-2.0\n//  Copyright 2026 Dionysis Karatzas\n//"
 --hex-grouping 4,8
 --hex-literal-case uppercase
 --ifdef indent
