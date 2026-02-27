@@ -9,6 +9,14 @@
 - request/reply correlation with timeouts
 - typed error mapping for common Cast error replies
 
+## When to Use This Guide
+
+Use this page when you are:
+
+- tuning reconnect behavior for production conditions
+- integrating runtime logs/metrics/traces into your app telemetry
+- validating failure semantics (timeouts, disconnects, non-success replies)
+
 ## Session Configuration
 
 Tune runtime behavior with ``CastSession/Configuration``:
@@ -105,6 +113,8 @@ The runtime emits structured events for reconnect lifecycle milestones:
 - reconnect attempts, delays, success, failures
 - network-wait timeout when path gating is enabled
 
+Observability hooks are intentionally scoped to session runtime/lifecycle paths.
+
 ## Error Model
 
 Most public failures are surfaced as ``CastError``.
@@ -133,3 +143,9 @@ If there is no active media session, media commands may throw ``CastError/noActi
 
 `ChromecastKit` focuses on platform/default-media-receiver behavior and extensibility.
 App-specific protocols (for example YouTube/Plex private namespaces) should be layered on top of custom namespace APIs.
+
+## See Also
+
+- <doc:Discovery-and-Sessions>
+- <doc:Discovery-Strategies-and-Network-Notes>
+- <doc:Custom-Namespaces-and-Handlers>

@@ -10,6 +10,14 @@ This is useful for:
 - inspecting casting groups reported by the multizone namespace
 - building group-aware UIs
 
+## When to Use This Guide
+
+Use this page when you need:
+
+- group-aware dashboards or route pickers
+- member/coordinator metadata for speaker groups
+- polling-based multizone state refresh patterns
+
 ## Querying Multizone State
 
 ```swift
@@ -44,3 +52,8 @@ Group devices may also appear during discovery as devices with capabilities such
 - ``CastDeviceCapability/multizone``
 
 You can include or exclude group devices through ``CastDiscovery/Configuration/includeGroups`` depending on your UI.
+
+## See Also
+
+- <doc:Discovery-and-Sessions>
+- <doc:Discovery-Strategies-and-Network-Notes>

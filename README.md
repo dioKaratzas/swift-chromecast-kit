@@ -14,16 +14,34 @@ A Swift package for Google Cast (Chromecast) focused on modern Swift concurrency
 - YouTube MDX quick-play and queue actions (`CastYouTubeController`)
 - subtitles/text tracks and queue APIs
 - custom namespace messaging for advanced integrations
+- two macOS example apps (`Player` and `Showcase`; scheme: `Showcase-macOS`)
 
 The core SDK does not host media/subtitles. App-specific protocols are opt-in controller layers (for example `CastYouTubeController` for YouTube MDX), while receiver/media/multizone controls remain concrete built-ins.
 
-## Why ChromecastKit
+## Documentation
 
-- Concurrency-first design (`actor`-based runtime, `AsyncStream` events)
-- Typed public models (`Sendable`, `Codable`) instead of ad-hoc JSON dictionaries
-- Strongly typed IDs (`CastMediaSessionID`, `CastAppID`, `CastTransportID`, etc.)
-- Advanced escape hatches (`CastNamespace`, `JSONValue`, binary namespace events)
-- macOS example app included in `./Example`
+- DocC reference: [diokaratzas.github.io/ChromecastKit](https://diokaratzas.github.io/ChromecastKit/documentation/chromecastkit/)
+
+### README Categories
+
+| Category | Jump to section |
+|---|---|
+| Getting started | [Quick Start](#quick-start) |
+| Playback and tracks | [Subtitles (WebVTT)](#subtitles-webvtt), [Queues](#queues) |
+| Reliability and runtime | [Recovery Policy (Reconnect)](#recovery-policy-reconnect), [Observability Hooks](#observability-hooks) |
+| Discovery and network behavior | [Discovery Strategies](#discovery-strategies) |
+| Advanced integrations | [Custom Namespaces (Advanced)](#custom-namespaces-advanced), [YouTube (MDX Quick Play / Queue Actions)](#youtube-mdx-quick-play--queue-actions) |
+| Groups and multizone | [Multizone / Speaker Groups](#multizone--speaker-groups) |
+| Example apps | [Example Apps](#example-apps) |
+
+## Why Teams Choose ChromecastKit
+
+- Modern Swift runtime by default (`actor` isolation, `AsyncStream`, structured concurrency)
+- Typed APIs over dictionary glue (`Sendable` models, strong IDs, concrete controllers)
+- Reliable reconnect behavior (exponential backoff, jitter, retry limits, network-path-aware recovery)
+- Runtime observability hooks (structured logs, metrics, and traces for reconnect lifecycle events)
+- Advanced integration surface (custom namespaces, app-controller protocols, binary payload support)
+- Two production-style macOS examples in `./Example`: `Player` (focused playback UX) and `Showcase` (scheme: `Showcase-macOS`, full SDK surface)
 
 ## Installation
 
@@ -187,7 +205,7 @@ Important subtitle hosting requirements:
 - CORS enabled (commonly required for text track loading)
 - avoid `localhost` unless the Chromecast can resolve/reach it
 
-The Example app includes a local-file demo (with an app-only embedded HTTP server) for local testing.
+The Example apps include a local-file demo (with an app-only embedded HTTP server) for local testing.
 That helper is not part of the `ChromecastKit` package API.
 
 ## Queues
@@ -323,13 +341,13 @@ let manual = await discovery.addKnownHost(host: "192.168.1.50", friendlyName: "O
 print(manual.id)
 ```
 
-## Example App
+## Example Apps
 
-A macOS showcase app is included in:
+Two macOS apps are included in:
 
-- `./Example`
+- `./Example` (`Player` and `Showcase` apps; Showcase runs via the `Showcase-macOS` scheme)
 
-It demonstrates:
+Together they demonstrate:
 - discovery and device selection
 - session connect/disconnect/reconnect
 - receiver controls

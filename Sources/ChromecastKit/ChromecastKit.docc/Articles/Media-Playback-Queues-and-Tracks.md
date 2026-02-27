@@ -18,6 +18,14 @@ try await session.launchDefaultMediaReceiver()
 _ = try await session.waitForApp(.defaultMediaReceiver, timeout: 6)
 ```
 
+## When to Use This Guide
+
+Use this page when you need:
+
+- typed load/playback APIs for the default media namespace
+- subtitle/text track control and styling
+- queue orchestration (load/insert/reorder/update/navigation)
+
 ## Loading Media
 
 Use ``CastMediaItem`` for typed media payloads:
@@ -135,3 +143,9 @@ if let media = await session.mediaStatus() {
 - media metadata
 - text tracks / active tracks
 - queue status fields
+
+## See Also
+
+- <doc:Discovery-and-Sessions>
+- <doc:Runtime-Behavior-and-Error-Handling>
+- <doc:Custom-Namespaces-and-Handlers>

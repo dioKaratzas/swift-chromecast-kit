@@ -10,6 +10,14 @@
 
 The public API hides backend implementation details behind ``CastDiscovery``.
 
+## When to Use This Guide
+
+Use this page when you need:
+
+- stable discovery behavior across mixed/home/enterprise networks
+- fallback behavior when Bonjour is unavailable
+- practical debugging hints for local-network failures
+
 ## Discovery Configuration
 
 Use ``CastDiscovery/Configuration`` to tune behavior:
@@ -69,3 +77,9 @@ For reliable subtitles:
 - prefer WebVTT (`text/vtt`)
 - enable CORS for text track resources
 - do not use `localhost` unless the Chromecast can reach that host
+
+## See Also
+
+- <doc:Discovery-and-Sessions>
+- <doc:Runtime-Behavior-and-Error-Handling>
+- <doc:Media-Playback-Queues-and-Tracks>

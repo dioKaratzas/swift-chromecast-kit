@@ -14,6 +14,14 @@ This keeps app architecture simple:
 3. create a session
 4. connect and control
 
+## When to Use This Guide
+
+Use this page when you want:
+
+- a clean device-picker + session lifecycle architecture
+- one-shot or continuous discovery patterns
+- a reliable baseline before adding media and app-specific integrations
+
 ## Basic Flow
 
 ```swift
@@ -100,3 +108,8 @@ if let app = await session.receiverStatus()?.app {
 }
 ```
 
+## See Also
+
+- <doc:Discovery-Strategies-and-Network-Notes>
+- <doc:Media-Playback-Queues-and-Tracks>
+- <doc:Runtime-Behavior-and-Error-Handling>

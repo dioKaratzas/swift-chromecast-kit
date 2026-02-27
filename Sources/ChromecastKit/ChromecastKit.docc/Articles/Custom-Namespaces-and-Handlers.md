@@ -14,6 +14,14 @@ Many Cast apps use custom namespaces beyond the standard receiver/media channels
 
 This is the extension point used for future app-specific controllers.
 
+## When to Use This Guide
+
+Use this page when you need:
+
+- custom namespace request/reply flows
+- binary namespace payload handling
+- reusable app-specific controllers with lifecycle callbacks
+
 ## Sending JSON Payloads
 
 Send a JSON object (`[String: JSONValue]`) to a custom namespace:
@@ -164,3 +172,9 @@ device/playback controls, keep using the built-in concrete controllers:
 
 - Core Cast namespaces (`receiver`, `media`, `heartbeat`, `connection`, `multizone`) are handled by the SDK runtime and are not emitted as custom namespace events.
 - App-specific protocols often require handshake/stateful logic on top of namespace messages. Build that logic in a separate controller type and keep transport details inside the session APIs.
+
+## See Also
+
+- <doc:Discovery-and-Sessions>
+- <doc:Media-Playback-Queues-and-Tracks>
+- <doc:Runtime-Behavior-and-Error-Handling>

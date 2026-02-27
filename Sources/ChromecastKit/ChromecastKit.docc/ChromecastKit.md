@@ -20,6 +20,28 @@ The public API is intentionally split between:
 - typed domain models (`CastMediaItem`, `CastReceiverStatus`, `CastMediaStatus`, etc.)
 - advanced extensibility (`CastNamespace`, namespace events/handlers)
 
+## Start Here
+
+If you are new to the package, use this order:
+
+1. <doc:Discovery-and-Sessions>
+2. <doc:Media-Playback-Queues-and-Tracks>
+3. <doc:Runtime-Behavior-and-Error-Handling>
+
+## Read by Scenario
+
+- First-time Cast flow (discover -> connect -> launch -> play):
+  - <doc:Discovery-and-Sessions>
+  - <doc:Media-Playback-Queues-and-Tracks>
+- Production runtime behavior and reconnect tuning:
+  - <doc:Runtime-Behavior-and-Error-Handling>
+- Network-restricted environments and discovery fallback:
+  - <doc:Discovery-Strategies-and-Network-Notes>
+- Custom app integrations and namespace protocols:
+  - <doc:Custom-Namespaces-and-Handlers>
+- Speaker groups and multizone metadata:
+  - <doc:Multizone-and-Groups>
+
 ## Topics
 
 ### Essentials
