@@ -610,6 +610,91 @@ struct CastSessionPublicAPITests {
         await session.disconnect(reason: .requested)
     }
 
+    @Test("youtube controller quickPlay rebinds and retries session request on 404")
+    func youtubeControllerQuickPlayRebindsAndRetriesOn404() async throws {
+        let transport = CastSessionTestTransport()
+        let runtime = CastSessionRuntime(
+            device: .init(id: "device-1", friendlyName: "Living Room", host: "192.168.1.10"),
+            transport: transport,
+            configuration: .init(heartbeatInterval: 0, autoReconnect: false)
+        )
+        let session = CastSession(runtime: runtime)
+
+        let httpClient = RecordingYouTubeHTTPClient(
+            responses: [
+                .success(
+                    .init(
+                        statusCode: 200,
+                        body: Data(#"{"screens":[{"loungeToken":"LOUNGE-1"}]}"#.utf8)
+                    )
+                ),
+                .success(
+                    .init(
+                        statusCode: 200,
+                        body: Data(#"["noop",["c","SID-1",""],["S","GSESSION-1"]]"#.utf8)
+                    )
+                ),
+                .success(
+                    .init(
+                        statusCode: 404,
+                        body: Data("Session expired".utf8)
+                    )
+                ),
+                .success(
+                    .init(
+                        statusCode: 200,
+                        body: Data(#"["noop",["c","SID-2",""],["S","GSESSION-2"]]"#.utf8)
+                    )
+                ),
+                .success(
+                    .init(
+                        statusCode: 200,
+                        body: Data("OK".utf8)
+                    )
+                ),
+            ]
+        )
+        let controller = CastYouTubeController(
+            launchPolicy: .manual,
+            requestTimeout: 10,
+            httpClient: httpClient
+        )
+
+        try await session.connect()
+        await emitYouTubeReceiverReadyStatus(on: transport)
+        let ready = await waitForYouTubeReceiverReady(on: session)
+        #expect(ready)
+
+        let task = Task {
+            try await controller.quickPlay(
+                .init(videoID: "dQw4w9WgXcQ"),
+                in: session,
+                timeout: 2
+            )
+        }
+
+        _ = try #require(
+            await waitForCommand(on: transport, namespace: .youtubeMDX),
+            "Expected getMdxSessionStatus command"
+        )
+        await emitYouTubeMDXSessionStatus(on: transport, screenID: "screen-xyz")
+
+        try await task.value
+
+        let requests = await httpClient.requests()
+        #expect(requests.count == 5)
+
+        let firstSessionRequest = requests[2]
+        #expect(firstSessionRequest.query.contains(.init(name: "SID", value: "SID-1")))
+        #expect(firstSessionRequest.query.contains(.init(name: "gsessionid", value: "GSESSION-1")))
+
+        let retriedSessionRequest = requests[4]
+        #expect(retriedSessionRequest.query.contains(.init(name: "SID", value: "SID-2")))
+        #expect(retriedSessionRequest.query.contains(.init(name: "gsessionid", value: "GSESSION-2")))
+
+        await session.disconnect(reason: .requested)
+    }
+
     private func waitForCommand(
         on transport: CastSessionTestTransport,
         requestID: CastRequestID,

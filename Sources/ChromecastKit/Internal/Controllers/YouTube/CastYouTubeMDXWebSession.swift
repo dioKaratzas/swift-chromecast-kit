@@ -282,10 +282,14 @@ actor CastYouTubeMDXWebSession {
         _ request: CastYouTubeHTTPRequest,
         sessionRequest: Bool
     ) async throws -> CastYouTubeHTTPResponse {
-        let response = try await httpClient.post(request, timeout: timeout)
+        var request = request
+        var response = try await httpClient.post(request, timeout: timeout)
+        let shouldRebindAndRetrySessionRequest = response.statusCode == 400 || response.statusCode == 404
 
-        if sessionRequest, response.statusCode == 400 || response.statusCode == 404 {
+        if sessionRequest, shouldRebindAndRetrySessionRequest {
             try await bind()
+            request = refreshSessionRequestQuery(request)
+            response = try await httpClient.post(request, timeout: timeout)
         }
 
         guard (200 ... 299).contains(response.statusCode) else {
@@ -302,6 +306,28 @@ actor CastYouTubeMDXWebSession {
         rid += 1
 
         return response
+    }
+
+    private func refreshSessionRequestQuery(_ request: CastYouTubeHTTPRequest) -> CastYouTubeHTTPRequest {
+        guard let sid, sid.isEmpty == false,
+              let gsessionID, gsessionID.isEmpty == false else {
+            return request
+        }
+
+        var updated = request
+        updated.query = updated.query.map { item in
+            switch item.name {
+            case "SID":
+                return .init(name: "SID", value: sid)
+            case "gsessionid":
+                return .init(name: "gsessionid", value: gsessionID)
+            case "RID":
+                return .init(name: "RID", value: String(rid))
+            default:
+                return item
+            }
+        }
+        return updated
     }
 
     private func requireScreenID() throws -> String {
