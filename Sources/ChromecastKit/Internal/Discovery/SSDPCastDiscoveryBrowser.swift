@@ -13,7 +13,7 @@ import Foundation
 /// This is primarily useful on networks where Bonjour/mDNS browsing is restricted.
 /// It sends DIAL SSDP `M-SEARCH` queries and fetches device-description XML from `LOCATION`.
 actor SSDPCastDiscoveryBrowser: CastDiscoveryBrowser {
-    // MARK: Models
+    // MARK: Types
 
     // MARK: State
 

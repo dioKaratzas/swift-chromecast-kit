@@ -7,7 +7,7 @@
 import Foundation
 
 public extension CastSession {
-    // MARK: Public Models
+    // MARK: Public Types
 
     /// Token returned when registering a custom namespace handler on a `CastSession`.
     struct NamespaceHandlerToken: Sendable, Hashable, Codable, RawRepresentable {

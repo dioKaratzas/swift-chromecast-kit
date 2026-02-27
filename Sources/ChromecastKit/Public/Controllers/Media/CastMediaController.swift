@@ -11,7 +11,7 @@ import Foundation
 /// This actor emits typed media commands to the currently active application transport.
 /// Response parsing and session/media status handling will be layered on top later.
 public actor CastMediaController {
-    // MARK: Public Models
+    // MARK: Public Types
 
     /// Options for `load(_:options:)`.
     public struct LoadOptions: Sendable, Hashable, Codable {

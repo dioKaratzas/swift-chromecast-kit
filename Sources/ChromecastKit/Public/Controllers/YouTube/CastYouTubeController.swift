@@ -17,7 +17,7 @@ import Foundation
 /// - quick-play a YouTube video (play now or enqueue)
 /// - perform queue-oriented YouTube actions (add/play-next/remove/clear)
 public actor CastYouTubeController: CastAppController, CastQuickPlayController {
-    // MARK: Public Models
+    // MARK: Public Types
 
     /// A high-level quick-play request for YouTube content.
     public struct QuickPlayRequest: Sendable, Hashable, Codable {

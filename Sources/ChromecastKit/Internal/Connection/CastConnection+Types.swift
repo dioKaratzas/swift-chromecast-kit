@@ -7,7 +7,7 @@
 import Foundation
 
 extension CastConnection {
-    // MARK: Models
+    // MARK: Types
 
     typealias Configuration = CastSession.Configuration
     typealias DisconnectReason = CastSession.DisconnectReason
