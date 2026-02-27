@@ -5,18 +5,28 @@
 [![Platforms](https://img.shields.io/badge/platforms-iOS%2013%2B%20%7C%20macOS%2010.15%2B-blue)](https://github.com/dioKaratzas/swift-chromecast-kit/blob/main/Package.swift)
 [![Swift](https://img.shields.io/badge/swift-6.0-orange)](https://www.swift.org)
 
-A Swift package for Google Cast (Chromecast) focused on modern Swift concurrency, typed models, and ergonomic sender APIs.
+ChromecastKit is a production-focused Swift sender SDK for Google Cast (Chromecast), built around typed APIs, modern concurrency, and reliable session behavior.
 
-`ChromecastKit` provides:
-- device discovery (`mDNS`/Bonjour, optional SSDP fallback)
-- Cast v2 transport/session lifecycle
-- receiver/media/multizone controllers
+`ChromecastKit` includes:
+- device discovery (`mDNS`/Bonjour, optional SSDP fallback, manual known hosts)
+- Cast v2 transport and session lifecycle (`CastSession`)
+- receiver/media/multizone controllers (`session.receiver`, `session.media`, `session.multizone`)
 - YouTube MDX quick-play and queue actions (`CastYouTubeController`)
-- subtitles/text tracks and queue APIs
+- subtitles/text tracks and queue APIs for default media receiver flows
 - custom namespace messaging for advanced integrations
-- two macOS example apps (`Player` and `Showcase`; scheme: `Showcase-macOS`)
+- two macOS example apps in `./Example` (`Player` and `Showcase`; scheme: `Showcase-macOS`)
 
-The core SDK does not host media/subtitles. App-specific protocols are opt-in controller layers (for example `CastYouTubeController` for YouTube MDX), while receiver/media/multizone controls remain concrete built-ins.
+### At a Glance
+
+| Area | What you get |
+|---|---|
+| API design | Strongly typed `Sendable` models and Swift-native APIs |
+| Runtime reliability | Reconnect policy controls (backoff, jitter, retry caps, network-path-aware behavior) |
+| Observability | Runtime log/metric/trace hooks for reconnect lifecycle events |
+| Extensibility | Custom namespaces, binary payload support, app-controller protocols |
+| Example coverage | `Player` for focused flows and `Showcase` for broad SDK surface exploration |
+
+ChromecastKit is a sender/control SDK. It does not host media or subtitles. App-specific/private protocol logic stays in optional controller layers (for example `CastYouTubeController`), while receiver/media/multizone control remains concrete built-in functionality.
 
 ## Documentation
 
@@ -26,9 +36,9 @@ The core SDK does not host media/subtitles. App-specific protocols are opt-in co
 
 | Category | Jump to section |
 |---|---|
-| Getting started | [Quick Start](#quick-start) |
-| Playback and tracks | [Subtitles (WebVTT)](#subtitles-webvtt), [Queues](#queues) |
-| Reliability and runtime | [Recovery Policy (Reconnect)](#recovery-policy-reconnect), [Observability Hooks](#observability-hooks) |
+| Getting started | [Installation](#installation), [Quick Start](#quick-start) |
+| Runtime and reliability | [Recovery Policy (Reconnect)](#recovery-policy-reconnect), [Observability Hooks](#observability-hooks) |
+| Playback and tracks | [Subtitles (WebVTT)](#subtitles-webvtt), [Queues](#queues), [Receiver Controls (Work With Any App)](#receiver-controls-work-with-any-app) |
 | Discovery and network behavior | [Discovery Strategies](#discovery-strategies) |
 | Advanced integrations | [Custom Namespaces (Advanced)](#custom-namespaces-advanced), [YouTube (MDX Quick Play / Queue Actions)](#youtube-mdx-quick-play--queue-actions) |
 | Groups and multizone | [Multizone / Speaker Groups](#multizone--speaker-groups) |
@@ -36,12 +46,12 @@ The core SDK does not host media/subtitles. App-specific protocols are opt-in co
 
 ## Why Teams Choose ChromecastKit
 
-- Modern Swift runtime by default (`actor` isolation, `AsyncStream`, structured concurrency)
-- Typed APIs over dictionary glue (`Sendable` models, strong IDs, concrete controllers)
-- Reliable reconnect behavior (exponential backoff, jitter, retry limits, network-path-aware recovery)
-- Runtime observability hooks (structured logs, metrics, and traces for reconnect lifecycle events)
-- Advanced integration surface (custom namespaces, app-controller protocols, binary payload support)
-- Two production-style macOS examples in `./Example`: `Player` (focused playback UX) and `Showcase` (scheme: `Showcase-macOS`, full SDK surface)
+- Swift Concurrency-first runtime (`actor` isolation, `AsyncStream`, structured async workflows)
+- Typed APIs instead of dictionary-heavy callsites (`Sendable` models, strong IDs, concrete controllers)
+- Production reconnect controls (exponential backoff, jitter, retry limits, network-path-aware recovery)
+- Built-in runtime observability (structured logs, metrics, traces for reconnect lifecycle events)
+- Advanced extension points for app-specific protocols (custom namespaces and controller protocols)
+- Two example apps to accelerate adoption: `Player` for focused flows and `Showcase` for full-surface integration patterns
 
 ## Installation
 
@@ -343,11 +353,15 @@ print(manual.id)
 
 ## Example Apps
 
-Two macOS apps are included in:
-
+Location:
 - `./Example` (`Player` and `Showcase` apps; Showcase runs via the `Showcase-macOS` scheme)
 
-Together they demonstrate:
+Run locally:
+1. Open `./Example/Example.xcodeproj` in Xcode.
+2. Select the `Player` or `Showcase-macOS` scheme.
+3. Build and run on macOS.
+
+Coverage:
 - discovery and device selection
 - session connect/disconnect/reconnect
 - receiver controls
@@ -356,3 +370,9 @@ Together they demonstrate:
 - local file casting (app-only local HTTP hosting for demo use)
 - namespace inspection and custom messages
 - multizone status queries
+
+## License
+
+Apache-2.0. See [`LICENSE`](./LICENSE).
+
+Copyright 2026 Dionysis Karatzas.
