@@ -464,7 +464,7 @@ struct CastSessionTests {
         let first = try await nextConnectionEvent(&events)
         let second = try await nextConnectionEvent(&events)
         #expect(first == .disconnected(reason: .remoteClosed))
-        #expect(second == .connected)
+        #expect(second == .reconnected)
 
         let lifecycle = await transport.lifecycle()
         #expect(lifecycle.connects >= 2)
@@ -505,7 +505,7 @@ struct CastSessionTests {
             return
         }
         #expect(error == .connectionFailed("transient reconnect failure"))
-        #expect(third == .connected)
+        #expect(third == .reconnected)
 
         let lifecycle = await transport.lifecycle()
         #expect(lifecycle.connects >= 3) // initial + failed retry + successful retry
@@ -544,6 +544,132 @@ struct CastSessionTests {
         #expect(error == .connectionFailed("socket error"))
         #expect(disconnectedEvent == .disconnected(reason: .networkError))
         #expect(await session.connectionState() == .disconnected)
+    }
+
+    @Test("auto reconnect respects reconnect max attempt cap")
+    func autoReconnectRespectsMaxAttempts() async throws {
+        let transport = TestSessionTransport()
+        let device = CastDeviceDescriptor(
+            id: "device-1",
+            friendlyName: "Living Room",
+            host: "192.168.1.10",
+            port: 8009
+        )
+        let session = CastSessionRuntime(
+            device: device,
+            transport: transport,
+            configuration: .init(
+                heartbeatInterval: 0,
+                autoReconnect: true,
+                reconnectPolicy: .fixed(delay: 0.01, maxAttempts: 2, waitsForReachableNetworkPath: false)
+            )
+        )
+        var events = await session.connectionEvents().makeAsyncIterator()
+
+        try await session.connect()
+        _ = try await nextConnectionEvent(&events) // connected
+
+        await transport.failNextConnect(with: .connectionFailed("retry 1 failed"))
+        await transport.failNextConnect(with: .connectionFailed("retry 2 failed"))
+        await transport.emitInboundEvent(.closed)
+
+        _ = try await nextConnectionEvent(&events) // disconnected
+        _ = try await nextConnectionEvent(&events) // retry 1 error
+        _ = try await nextConnectionEvent(&events) // retry 2 error
+
+        try await Task.sleep(nanoseconds: 120_000_000)
+        let lifecycle = await transport.lifecycle()
+        #expect(lifecycle.connects == 3) // initial + two capped retries
+    }
+
+    @Test("receiver-only restoration policy skips app/media transport bootstrap")
+    func receiverOnlyRestorationSkipsMediaBootstrap() async throws {
+        let transport = TestSessionTransport()
+        let device = CastDeviceDescriptor(
+            id: "device-1",
+            friendlyName: "Living Room",
+            host: "192.168.1.10",
+            port: 8009
+        )
+        let session = CastSessionRuntime(
+            device: device,
+            transport: transport,
+            configuration: .init(
+                heartbeatInterval: 0,
+                autoReconnect: false,
+                stateRestorationPolicy: .receiverOnly
+            )
+        )
+
+        try await session.connect()
+        let receiverStatusMessage = CastInboundMessage(
+            route: .init(
+                sourceID: "receiver-0",
+                destinationID: "sender-0",
+                namespace: .receiver
+            ),
+            payloadUTF8: #"{"type":"RECEIVER_STATUS","status":{"applications":[{"appId":"CC1AD845","displayName":"Default Media Receiver","sessionId":"app-session","transportId":"web-9","namespaces":[{"name":"urn:x-cast:com.google.cast.media"}]}],"volume":{"level":0.5,"muted":false}}}"#
+        )
+
+        _ = try await session.applyInboundMessage(receiverStatusMessage)
+        let commands = await transport.commands()
+        let appConnects = commands.filter {
+            $0.route.namespace == .connection && $0.route.destinationID == "web-9"
+        }
+        let mediaStatuses = commands.filter {
+            $0.route.namespace == .media && $0.route.destinationID == "web-9"
+        }
+
+        #expect(appConnects.isEmpty)
+        #expect(mediaStatuses.isEmpty)
+    }
+
+    @Test("observability callbacks receive reconnect recovery events")
+    func observabilityReceivesRecoveryEvents() async throws {
+        let transport = TestSessionTransport()
+        let collector = SessionObservabilityCollector()
+        let device = CastDeviceDescriptor(
+            id: "device-1",
+            friendlyName: "Living Room",
+            host: "192.168.1.10",
+            port: 8009
+        )
+        let observability = CastSession.Observability(
+            onLog: { event in
+                collector.recordLog(event)
+            },
+            onMetric: { event in
+                collector.recordMetric(event)
+            },
+            onTrace: { event in
+                collector.recordTrace(event)
+            }
+        )
+        let session = CastSessionRuntime(
+            device: device,
+            transport: transport,
+            configuration: .init(
+                heartbeatInterval: 0,
+                autoReconnect: true,
+                reconnectPolicy: .fixed(delay: 0, maxAttempts: 1, waitsForReachableNetworkPath: false)
+            ),
+            observability: observability
+        )
+        var events = await session.connectionEvents().makeAsyncIterator()
+
+        try await session.connect()
+        _ = try await nextConnectionEvent(&events) // connected
+        await transport.emitInboundEvent(.closed)
+        _ = try await nextConnectionEvent(&events) // disconnected
+        _ = try await nextConnectionEvent(&events) // reconnected
+
+        let logs = collector.logCodes()
+        let metrics = collector.metricNames()
+        let traces = collector.traceNamesByPhase()
+
+        #expect(logs.contains("recovery_started"))
+        #expect(metrics.contains("cast.session.reconnect.attempt"))
+        #expect(traces.contains("cast.session.recovery:begin"))
     }
 
     private func nextConnectionEvent(
@@ -647,5 +773,51 @@ private actor TestSessionTransport: CastConnectionTransport, CastCommandTranspor
         for continuation in inboundEventContinuations.values {
             continuation.yield(reply)
         }
+    }
+}
+
+private final class SessionObservabilityCollector: @unchecked Sendable {
+    private var lock = NSLock()
+    private var logs = [CastSession.LogEvent]()
+    private var metrics = [CastSession.MetricEvent]()
+    private var traces = [CastSession.TraceEvent]()
+
+    func recordLog(_ event: CastSession.LogEvent) {
+        lock.lock()
+        logs.append(event)
+        lock.unlock()
+    }
+
+    func recordMetric(_ event: CastSession.MetricEvent) {
+        lock.lock()
+        metrics.append(event)
+        lock.unlock()
+    }
+
+    func recordTrace(_ event: CastSession.TraceEvent) {
+        lock.lock()
+        traces.append(event)
+        lock.unlock()
+    }
+
+    func logCodes() -> [String] {
+        lock.lock()
+        let result = logs.map(\.code)
+        lock.unlock()
+        return result
+    }
+
+    func metricNames() -> [String] {
+        lock.lock()
+        let result = metrics.map(\.name)
+        lock.unlock()
+        return result
+    }
+
+    func traceNamesByPhase() -> [String] {
+        lock.lock()
+        let result = traces.map { "\($0.name):\($0.phase.rawValue)" }
+        lock.unlock()
+        return result
     }
 }

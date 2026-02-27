@@ -76,4 +76,7 @@ The public API is intentionally split between:
 
 - <doc:Runtime-Behavior-and-Error-Handling>
 - ``CastSession/Configuration``
+- ``CastSession/ReconnectPolicy``
+- ``CastSession/StateRestorationPolicy``
+- ``CastSession/Observability``
 - ``CastError``

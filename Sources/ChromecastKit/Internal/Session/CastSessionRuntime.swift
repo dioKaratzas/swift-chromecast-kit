@@ -21,7 +21,11 @@ actor CastSessionRuntime {
     private let inboundEventTransport: (any CastInboundEventTransport)?
     private let heartbeatInterval: TimeInterval
     private let autoReconnect: Bool
-    private let reconnectRetryDelay: TimeInterval
+    private let reconnectPolicy: CastSession.ReconnectPolicy
+    private let stateRestorationPolicy: CastSession.StateRestorationPolicy
+    private let observability: CastSession.Observability
+    private let networkPathMonitor: (any CastNetworkPathMonitoring)?
+    private let reconnectRandomUnit: @Sendable () -> Double
     private var inboundTask: Task<Void, Never>?
     private var heartbeatTask: Task<Void, Never>?
     private var recoveryTask: Task<Void, Never>?
@@ -58,7 +62,11 @@ actor CastSessionRuntime {
         inboundEventTransport: (any CastInboundEventTransport)? = nil,
         heartbeatInterval: TimeInterval = 5,
         autoReconnect: Bool = true,
-        reconnectRetryDelay: TimeInterval = 1
+        reconnectPolicy: CastSession.ReconnectPolicy = .exponential(initialDelay: 1),
+        stateRestorationPolicy: CastSession.StateRestorationPolicy = .receiverAndMedia,
+        observability: CastSession.Observability = .disabled,
+        networkPathMonitor: (any CastNetworkPathMonitoring)? = nil,
+        reconnectRandomUnit: @escaping @Sendable () -> Double = { Double.random(in: 0 ... 1) }
     ) {
         self.device = device
         self.connection = connection
@@ -72,13 +80,20 @@ actor CastSessionRuntime {
         self.inboundEventTransport = inboundEventTransport
         self.heartbeatInterval = heartbeatInterval
         self.autoReconnect = autoReconnect
-        self.reconnectRetryDelay = reconnectRetryDelay
+        self.reconnectPolicy = reconnectPolicy
+        self.stateRestorationPolicy = stateRestorationPolicy
+        self.observability = observability
+        self.networkPathMonitor = networkPathMonitor
+        self.reconnectRandomUnit = reconnectRandomUnit
     }
 
     init(
         device: CastDeviceDescriptor,
         transport: any CastConnectionTransport & CastCommandTransport,
-        configuration: CastConnection.Configuration = .init()
+        configuration: CastConnection.Configuration = .init(),
+        observability: CastSession.Observability = .disabled,
+        networkPathMonitor: (any CastNetworkPathMonitoring)? = nil,
+        reconnectRandomUnit: @escaping @Sendable () -> Double = { Double.random(in: 0 ... 1) }
     ) {
         let connection = CastConnection(configuration: configuration, transport: transport)
         let dispatcher = CastCommandDispatcher(transport: transport, defaultReplyTimeout: configuration.commandTimeout)
@@ -107,7 +122,16 @@ actor CastSessionRuntime {
             inboundEventTransport: inboundEventTransport,
             heartbeatInterval: configuration.heartbeatInterval,
             autoReconnect: configuration.autoReconnect,
-            reconnectRetryDelay: configuration.reconnectRetryDelay
+            reconnectPolicy: configuration.reconnectPolicy,
+            stateRestorationPolicy: configuration.stateRestorationPolicy,
+            observability: observability,
+            networkPathMonitor: networkPathMonitor ?? {
+                guard configuration.reconnectPolicy.waitsForReachableNetworkPath else {
+                    return nil
+                }
+                return CastSystemNetworkPathMonitor()
+            }(),
+            reconnectRandomUnit: reconnectRandomUnit
         )
     }
 
@@ -252,7 +276,7 @@ actor CastSessionRuntime {
         let handledHeartbeat = try await handleHeartbeatMessage(message)
         let matchedPendingReply = try await dispatcher.consumeInboundMessage(message)
         let handledStatus = try await statusProcessor.apply(message)
-        if handledStatus {
+        if handledStatus, stateRestorationPolicy == .receiverAndMedia {
             do {
                 try await synchronizeApplicationTransportBootstrapIfNeeded()
             } catch {
@@ -448,6 +472,14 @@ actor CastSessionRuntime {
     }
 
     private func performRecovery(reason: CastConnection.DisconnectReason) async {
+        let traceID = UUID()
+        emitTrace(
+            name: "cast.session.recovery",
+            phase: .begin,
+            traceID: traceID,
+            attributes: ["reason": reason.rawValue]
+        )
+
         inboundTask?.cancel()
         inboundTask = nil
         heartbeatTask?.cancel()
@@ -458,32 +490,168 @@ actor CastSessionRuntime {
         await connection.disconnect(reason: reason)
 
         guard autoReconnect else {
+            emitRecoveryLog(
+                level: .info,
+                code: "recovery_skipped_auto_reconnect_disabled",
+                message: "Skipping recovery because autoReconnect is disabled",
+                reason: reason
+            )
+            emitRecoveryTraceEnd(traceID: traceID, outcome: "disabled")
             return
         }
 
+        emitRecoveryLog(
+            level: .info,
+            code: "recovery_started",
+            message: "Starting reconnect recovery loop",
+            reason: reason
+        )
+        emitReconnectMetric(
+            name: "cast.session.recovery.started",
+            value: 1,
+            unit: "count",
+            dimensions: ["reason": reason.rawValue]
+        )
+
+        let recoveryStartedAt = Date()
+        var attempt = 1
         while Task.isCancelled == false {
+            if let maxAttempts = reconnectPolicy.maxAttempts, attempt > maxAttempts {
+                emitRecoveryLog(
+                    level: .warning,
+                    code: "reconnect_give_up",
+                    message: "Reconnect attempt cap reached",
+                    reason: reason,
+                    attempt: attempt - 1,
+                    metadata: ["maxAttempts": "\(maxAttempts)"]
+                )
+                emitReconnectMetric(
+                    name: "cast.session.reconnect.give_up",
+                    value: 1,
+                    unit: "count",
+                    dimensions: ["reason": reason.rawValue]
+                )
+                emitRecoveryTraceEnd(traceID: traceID, outcome: "max_attempts_reached", attempts: attempt - 1)
+                return
+            }
+
+            if attempt > 1 {
+                let delay = reconnectPolicy.retryDelay(
+                    forAttempt: attempt - 1,
+                    randomUnit: reconnectRandomUnit()
+                )
+                if delay > 0 {
+                    emitReconnectMetric(
+                        name: "cast.session.reconnect.delay",
+                        value: delay,
+                        unit: "seconds",
+                        attempt: attempt
+                    )
+                    do {
+                        try await CastTaskTiming.sleep(for: delay)
+                    } catch {
+                        emitRecoveryTraceEnd(traceID: traceID, outcome: "cancelled", attempts: attempt - 1)
+                        return
+                    }
+                }
+            }
+
+            if reconnectPolicy.waitsForReachableNetworkPath, let networkPathMonitor {
+                let currentStatus = await networkPathMonitor.status()
+                if currentStatus != .satisfied {
+                    emitRecoveryLog(
+                        level: .info,
+                        code: "network_wait_started",
+                        message: "Waiting for reachable network path before reconnect",
+                        reason: reason,
+                        attempt: attempt,
+                        metadata: ["status": currentStatus.rawValue]
+                    )
+                    let reachable = await networkPathMonitor.waitForReachable(
+                        timeout: reconnectPolicy.networkPathWaitTimeout
+                    )
+                    if reachable == false {
+                        emitRecoveryLog(
+                            level: .warning,
+                            code: "network_wait_timeout",
+                            message: "Timed out waiting for reachable network path",
+                            reason: reason,
+                            attempt: attempt
+                        )
+                        emitReconnectMetric(
+                            name: "cast.session.reconnect.network_wait_timeout",
+                            value: 1,
+                            unit: "count",
+                            attempt: attempt
+                        )
+                        attempt += 1
+                        continue
+                    }
+                }
+            }
+
+            let attemptStartedAt = Date()
+            emitReconnectMetric(
+                name: "cast.session.reconnect.attempt",
+                value: 1,
+                unit: "count",
+                attempt: attempt
+            )
             do {
-                try await connection.connect()
+                try await connection.reconnect()
                 do {
                     try await finishPostConnectBootstrap()
+                    emitRecoveryLog(
+                        level: .info,
+                        code: "reconnect_success",
+                        message: "Reconnect recovery succeeded",
+                        reason: reason,
+                        attempt: attempt
+                    )
+                    emitReconnectMetric(
+                        name: "cast.session.reconnect.success",
+                        value: 1,
+                        unit: "count",
+                        attempt: attempt
+                    )
+                    emitReconnectMetric(
+                        name: "cast.session.reconnect.attempt_duration",
+                        value: Date().timeIntervalSince(attemptStartedAt),
+                        unit: "seconds",
+                        attempt: attempt
+                    )
+                    emitReconnectMetric(
+                        name: "cast.session.recovery.duration",
+                        value: Date().timeIntervalSince(recoveryStartedAt),
+                        unit: "seconds",
+                        dimensions: ["attempts": "\(attempt)"]
+                    )
+                    emitRecoveryTraceEnd(traceID: traceID, outcome: "success", attempts: attempt)
                     return
                 } catch {
                     await handleBootstrapFailure(error)
                 }
             } catch {
+                emitRecoveryLog(
+                    level: .warning,
+                    code: "reconnect_attempt_failed",
+                    message: "Reconnect attempt failed",
+                    reason: reason,
+                    attempt: attempt,
+                    metadata: ["error": String(describing: error)]
+                )
+                emitReconnectMetric(
+                    name: "cast.session.reconnect.failure",
+                    value: 1,
+                    unit: "count",
+                    attempt: attempt
+                )
                 // Connection actor already emitted error state/event.
             }
-
-            guard reconnectRetryDelay > 0 else {
-                continue
-            }
-
-            do {
-                try await CastTaskTiming.sleep(for: reconnectRetryDelay)
-            } catch {
-                return
-            }
+            attempt += 1
         }
+
+        emitRecoveryTraceEnd(traceID: traceID, outcome: "cancelled")
     }
 
     private func handleInboundTransportEvent(_ event: CastInboundTransportEvent) async {
@@ -563,5 +731,94 @@ actor CastSessionRuntime {
         await dispatcher.failAllPendingReplies(with: castError)
         await connection.reportRuntimeError(castError)
         scheduleRecoveryIfNeeded(reason: recoveryReason)
+    }
+
+    private func emitRecoveryLog(
+        level: CastSession.LogEvent.Level,
+        code: String,
+        message: String,
+        reason: CastConnection.DisconnectReason? = nil,
+        attempt: Int? = nil,
+        metadata: [String: String] = [:]
+    ) {
+        var mergedMetadata = metadata
+        if let reason {
+            mergedMetadata["reason"] = reason.rawValue
+        }
+        if let attempt {
+            mergedMetadata["attempt"] = "\(attempt)"
+        }
+        emitLog(level: level, code: code, message: message, metadata: mergedMetadata)
+    }
+
+    private func emitReconnectMetric(
+        name: String,
+        value: Double,
+        unit: String,
+        attempt: Int? = nil,
+        dimensions: [String: String] = [:]
+    ) {
+        var mergedDimensions = dimensions
+        if let attempt {
+            mergedDimensions["attempt"] = "\(attempt)"
+        }
+        emitMetric(name: name, value: value, unit: unit, dimensions: mergedDimensions)
+    }
+
+    private func emitRecoveryTraceEnd(traceID: UUID, outcome: String, attempts: Int? = nil) {
+        var attributes = [String: String]()
+        attributes["outcome"] = outcome
+        if let attempts {
+            attributes["attempts"] = "\(attempts)"
+        }
+        emitTrace(name: "cast.session.recovery", phase: .end, traceID: traceID, attributes: attributes)
+    }
+
+    private func emitLog(
+        level: CastSession.LogEvent.Level,
+        code: String,
+        message: String,
+        metadata: [String: String] = [:]
+    ) {
+        observability.onLog?(
+            .init(
+                level: level,
+                code: code,
+                message: message,
+                metadata: metadata
+            )
+        )
+    }
+
+    private func emitMetric(
+        name: String,
+        value: Double,
+        unit: String,
+        dimensions: [String: String] = [:]
+    ) {
+        observability.onMetric?(
+            .init(
+                name: name,
+                value: value,
+                unit: unit,
+                dimensions: dimensions
+            )
+        )
+    }
+
+    private func emitTrace(
+        name: String,
+        phase: CastSession.TraceEvent.Phase,
+        traceID: UUID,
+        attributes: [String: String] = [:]
+    ) {
+        observability.onTrace?(
+            .init(
+                name: name,
+                phase: phase,
+                traceID: traceID,
+                attributes: attributes
+            )
+        )
     }
 }

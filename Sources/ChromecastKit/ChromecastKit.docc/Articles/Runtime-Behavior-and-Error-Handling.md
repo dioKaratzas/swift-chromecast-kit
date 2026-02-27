@@ -21,10 +21,26 @@ let session = CastSession(
         commandTimeout: 10,
         heartbeatInterval: 5,
         autoReconnect: true,
-        reconnectRetryDelay: 1
+        reconnectPolicy: .exponential(
+            initialDelay: 1,
+            maxDelay: 30,
+            multiplier: 2,
+            jitterFactor: 0.2,
+            maxAttempts: nil,
+            waitsForReachableNetworkPath: true
+        ),
+        stateRestorationPolicy: .receiverAndMedia
     )
 )
 ```
+
+Use ``CastSession/ReconnectPolicy`` to tune retry behavior:
+
+- fixed or exponential backoff
+- jitter
+- attempt cap
+- optional network-path gating before retries
+- optional wait timeout for reachable network
 
 ## Connection Events
 
@@ -45,6 +61,11 @@ for await event in await session.connectionEvents() {
 }
 ```
 
+Auto-recovery emits:
+
+- `.disconnected(reason:)` when runtime failure is detected
+- `.reconnected` when a reconnect attempt succeeds
+
 ## Request/Reply Timeouts
 
 When using ``CastSession/sendAndAwaitReply(namespace:target:payload:timeout:)``, the SDK:
@@ -55,6 +76,34 @@ When using ``CastSession/sendAndAwaitReply(namespace:target:payload:timeout:)``,
 - throws mapped errors for common Cast error reply messages
 
 This provides `async/await` ergonomics over an event-driven Cast protocol.
+
+## Observability Hooks
+
+Attach runtime diagnostics hooks when creating a session:
+
+```swift
+let session = CastSession(
+    device: device,
+    configuration: .init(),
+    observability: .init(
+        onLog: { log in
+            print("[\(log.level.rawValue)] \(log.code): \(log.message)")
+        },
+        onMetric: { metric in
+            print("metric \(metric.name)=\(metric.value) \(metric.unit)")
+        },
+        onTrace: { trace in
+            print("trace \(trace.name) \(trace.phase.rawValue) \(trace.traceID)")
+        }
+    )
+)
+```
+
+The runtime emits structured events for reconnect lifecycle milestones:
+
+- recovery start/finish
+- reconnect attempts, delays, success, failures
+- network-wait timeout when path gating is enabled
 
 ## Error Model
 
@@ -84,4 +133,3 @@ If there is no active media session, media commands may throw ``CastError/noActi
 
 `ChromecastKit` focuses on platform/default-media-receiver behavior and extensibility.
 App-specific protocols (for example YouTube/Plex private namespaces) should be layered on top of custom namespace APIs.
-

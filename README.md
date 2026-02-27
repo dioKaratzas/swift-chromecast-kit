@@ -108,6 +108,55 @@ for await event in await session.connectionEvents() {
 }
 ```
 
+## Recovery Policy (Reconnect)
+
+Tune retry behavior with `ReconnectPolicy`:
+
+```swift
+let session = CastSession(
+    device: device,
+    configuration: .init(
+        autoReconnect: true,
+        reconnectPolicy: .exponential(
+            initialDelay: 1,
+            maxDelay: 30,
+            multiplier: 2,
+            jitterFactor: 0.2,
+            maxAttempts: nil,
+            waitsForReachableNetworkPath: true
+        ),
+        stateRestorationPolicy: .receiverAndMedia
+    )
+)
+```
+
+Use `stateRestorationPolicy` to control reconnect bootstrap behavior:
+- `.receiverOnly` restores receiver state only
+- `.receiverAndMedia` restores receiver + media/app transport state
+
+## Observability Hooks
+
+Attach structured runtime diagnostics:
+
+```swift
+let session = CastSession(
+    device: device,
+    observability: .init(
+        onLog: { event in
+            print("[\(event.level.rawValue)] \(event.code): \(event.message)")
+        },
+        onMetric: { event in
+            print("metric \(event.name)=\(event.value) \(event.unit)")
+        },
+        onTrace: { event in
+            print("trace \(event.name) \(event.phase.rawValue) \(event.traceID)")
+        }
+    )
+)
+```
+
+Runtime observability currently focuses on recovery/reconnect lifecycle paths.
+
 ## Subtitles (WebVTT)
 
 Chromecast default media receivers expect subtitle tracks as WebVTT (`.vtt`) in most common flows.
