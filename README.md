@@ -43,6 +43,7 @@ ChromecastKit is a sender/control SDK. It does not host media or subtitles. App-
 | Advanced integrations | [Custom Namespaces (Advanced)](#custom-namespaces-advanced), [YouTube (MDX Quick Play / Queue Actions)](#youtube-mdx-quick-play--queue-actions) |
 | Groups and multizone | [Multizone / Speaker Groups](#multizone--speaker-groups) |
 | Example apps | [Example Apps](#example-apps) |
+| Contributions | [Contributing](#contributing) |
 
 ## Why Teams Choose ChromecastKit
 
@@ -370,6 +371,13 @@ Coverage:
 - local file casting (app-only local HTTP hosting for demo use)
 - namespace inspection and custom messages
 - multizone status queries
+
+## Contributing
+
+- Open an issue first for non-trivial changes.
+- Run tests locally: `swift test -q`.
+- Run formatting checks for changed Swift files: `scripts/swiftformat.sh lint-changed`.
+- Use the issue and pull request templates when opening changes.
 
 ## License
 

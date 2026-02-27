@@ -25,8 +25,7 @@ jobs:
   format:
     name: SwiftFormat
     if: github.event_name == 'pull_request' && github.event.pull_request.draft == false
-    runs-on: ubuntu-latest
-    container: swift:6.0
+    runs-on: macos-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -37,16 +36,9 @@ jobs:
         run: scripts/swiftformat.sh lint-changed
 
   test:
-    name: Test (Swift ${{ matrix.swift }})
+    name: Test
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        swift:
-          - "6.0"
-          - "6.1"
-    container: swift:${{ matrix.swift }}
+    runs-on: macos-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v5

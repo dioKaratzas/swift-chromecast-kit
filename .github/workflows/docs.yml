@@ -17,8 +17,7 @@ concurrency:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
-    container: swift:6.0
+    runs-on: macos-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v5
