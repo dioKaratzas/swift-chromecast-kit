@@ -30,7 +30,7 @@ ChromecastKit is a sender/control SDK. It does not host media or subtitles. App-
 
 ## Documentation
 
-- DocC reference: [diokaratzas.github.io/ChromecastKit](https://diokaratzas.github.io/ChromecastKit/documentation/chromecastkit/)
+- DocC reference: [diokaratzas.github.io/swift-chromecast-kit](https://diokaratzas.github.io/swift-chromecast-kit/documentation/chromecastkit/)
 
 ### README Categories
 
