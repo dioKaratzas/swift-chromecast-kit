@@ -673,6 +673,56 @@ struct CastSessionTests {
         #expect(traces.contains("cast.session.recovery:begin"))
     }
 
+    @Test("observability receives inbound runtime processing error diagnostics")
+    func observabilityReceivesInboundRuntimeErrors() async throws {
+        let transport = TestSessionTransport()
+        let collector = SessionObservabilityCollector()
+        let device = CastDeviceDescriptor(
+            id: "device-1",
+            friendlyName: "Living Room",
+            host: "192.168.1.10",
+            port: 8009
+        )
+        let observability = CastSession.Observability(
+            onLog: { event in
+                collector.recordLog(event)
+            },
+            onMetric: { event in
+                collector.recordMetric(event)
+            }
+        )
+        let session = CastSessionRuntime(
+            device: device,
+            transport: transport,
+            configuration: .init(heartbeatInterval: 0, autoReconnect: false),
+            observability: observability
+        )
+
+        try await session.connect()
+        await transport.emitInboundEvent(
+            .utf8(
+                .init(
+                    route: .init(sourceID: "receiver-0", destinationID: "sender-0", namespace: .receiver),
+                    payloadUTF8: "{"
+                )
+            )
+        )
+
+        let deadline = Date().addingTimeInterval(0.5)
+        var sawRuntimeErrorLog = false
+        while Date() < deadline {
+            if collector.logCodes().contains("inbound_event_ignored") {
+                sawRuntimeErrorLog = true
+                break
+            }
+            try? await Task.sleep(nanoseconds: 1_000_000)
+        }
+
+        #expect(sawRuntimeErrorLog)
+        #expect(collector.metricNames().contains("cast.session.runtime.inbound_error"))
+        await session.disconnect(reason: .requested)
+    }
+
     private func nextConnectionEvent(
         _ iterator: inout AsyncStream<CastConnection.Event>.AsyncIterator
     ) async throws -> CastConnection.Event {

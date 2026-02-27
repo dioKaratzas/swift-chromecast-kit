@@ -331,18 +331,14 @@ public actor CastSession {
     /// Unregisters a previously registered custom namespace event handler.
     ///
     /// If the token belongs to a controller registered with `registerController(_:)`, this also
-    /// detaches the controller and schedules its `willUnregister(from:)` callback.
+    /// detaches the controller and waits for its `willUnregister(from:)` callback to complete.
     /// Prefer `unregisterController(_:)` when you know the token is a controller token.
-    public func unregisterNamespaceHandler(_ token: NamespaceHandlerToken) {
+    public func unregisterNamespaceHandler(_ token: NamespaceHandlerToken) async {
         if let controller = registeredControllers.removeValue(forKey: token.controllerToken) {
             namespaceHandlers[token] = nil
             stopNamespaceHandlerFanoutIfNeeded()
             stopControllerFanoutIfNeeded()
-
-            let session = self
-            Task {
-                await controller.willUnregister(from: session)
-            }
+            await controller.willUnregister(from: self)
             return
         }
 
@@ -352,10 +348,10 @@ public actor CastSession {
 
     /// Unregisters a controller via the namespace-handler removal API.
     ///
-    /// This preserves the same "schedule `willUnregister` and return immediately" behavior as
+    /// This preserves the same `willUnregister(from:)` behavior as
     /// `unregisterNamespaceHandler(_:)` for namespace handler tokens.
-    public func unregisterNamespaceHandler(_ token: ControllerToken) {
-        unregisterNamespaceHandler(token.namespaceHandlerToken)
+    public func unregisterNamespaceHandler(_ token: ControllerToken) async {
+        await unregisterNamespaceHandler(token.namespaceHandlerToken)
     }
 
     /// Unregisters a previously registered `CastSessionController`.
@@ -376,19 +372,14 @@ public actor CastSession {
     }
 
     /// Removes all registered custom namespace handlers and session controllers.
-    public func removeAllNamespaceHandlers() {
+    public func removeAllNamespaceHandlers() async {
         let controllers = Array(registeredControllers.values)
         registeredControllers.removeAll(keepingCapacity: false)
         namespaceHandlers.removeAll(keepingCapacity: false)
         stopNamespaceHandlerFanoutIfNeeded(force: true)
         stopControllerFanoutIfNeeded(force: true)
-        if controllers.isEmpty == false {
-            let session = self
-            Task {
-                for controller in controllers {
-                    await controller.willUnregister(from: session)
-                }
-            }
+        for controller in controllers {
+            await controller.willUnregister(from: self)
         }
     }
 

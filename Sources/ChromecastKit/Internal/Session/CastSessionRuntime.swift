@@ -314,6 +314,12 @@ actor CastSessionRuntime {
                 do {
                     _ = try await actor.applyInboundMessage(message)
                 } catch {
+                    await actor.emitInboundRuntimeError(
+                        code: "inbound_message_ignored",
+                        message: "Ignoring inbound message after processing failure",
+                        error: error,
+                        namespace: message.route.namespace
+                    )
                     continue
                 }
             }
@@ -661,7 +667,12 @@ actor CastSessionRuntime {
             do {
                 _ = try await applyInboundMessage(message)
             } catch {
-                // Ignore malformed/unsupported messages at runtime boundary.
+                emitInboundRuntimeError(
+                    code: "inbound_event_ignored",
+                    message: "Ignoring inbound transport event after processing failure",
+                    error: error,
+                    namespace: message.route.namespace
+                )
             }
         case let .binary(message):
             lastHeartbeatActivityAt = Date()
@@ -732,6 +743,30 @@ actor CastSessionRuntime {
         await dispatcher.failAllPendingReplies(with: castError)
         await connection.reportRuntimeError(castError)
         scheduleRecoveryIfNeeded(reason: recoveryReason)
+    }
+
+    /// Emits runtime-boundary diagnostics for inbound message errors that are intentionally swallowed.
+    ///
+    /// These errors are non-fatal for the session loop, but are still surfaced through observability hooks
+    /// to aid debugging and production telemetry.
+    private func emitInboundRuntimeError(
+        code: String,
+        message: String,
+        error: any Error,
+        namespace: CastNamespace? = nil
+    ) {
+        var metadata = [String: String]()
+        metadata["error"] = String(describing: error)
+        if let namespace {
+            metadata["namespace"] = namespace.rawValue
+        }
+        emitLog(level: .warning, code: code, message: message, metadata: metadata)
+
+        var dimensions = ["code": code]
+        if let namespace {
+            dimensions["namespace"] = namespace.rawValue
+        }
+        emitMetric(name: "cast.session.runtime.inbound_error", value: 1, unit: "count", dimensions: dimensions)
     }
 
     private func emitRecoveryLog(

@@ -271,11 +271,7 @@ struct CastSessionPublicAPITests {
         #expect(await controller.didRegisterCount() == 1)
 
         await session.unregisterNamespaceHandler(token)
-
-        let unregisterCount = try #require(
-            await waitForSessionControllerValue(on: controller, keyPath: \.willUnregisterCount, atLeast: 1)
-        )
-        #expect(unregisterCount == 1)
+        #expect(await controller.willUnregisterCount() == 1)
 
         try await session.connect()
         await transport.emitInboundEvent(

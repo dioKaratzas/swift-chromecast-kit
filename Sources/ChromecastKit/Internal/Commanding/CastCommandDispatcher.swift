@@ -145,21 +145,25 @@ actor CastCommandDispatcher {
                         requestID: command.requestID,
                         operation: operation,
                         continuation: continuation,
-                        timeoutTask: nil
+                        timeoutTask: nil,
+                        sendTask: nil
                     ),
                     timeout: replyTimeout
                 )
 
-                Task {
+                let sendTask = Task { [requestID = command.requestID] in
                     do {
                         try await transport.send(command)
+                    } catch is CancellationError {
+                        self.cancelPendingReply(requestID: requestID)
                     } catch {
                         self.failPendingReply(
-                            requestID: command.requestID,
+                            requestID: requestID,
                             error: error is CastError ? error : CastError.connectionFailed(String(describing: error))
                         )
                     }
                 }
+                setPendingReplySendTask(sendTask, requestID: command.requestID)
             }
         } onCancel: {
             Task {
@@ -179,6 +183,7 @@ actor CastCommandDispatcher {
         }
 
         pendingReply.timeoutTask?.cancel()
+        pendingReply.sendTask?.cancel()
         if let replyError = try extractReplyError(from: message.payloadUTF8) {
             pendingReply.continuation.resume(throwing: replyError)
         } else {
@@ -218,6 +223,7 @@ actor CastCommandDispatcher {
             return
         }
         pendingReply.timeoutTask?.cancel()
+        pendingReply.sendTask?.cancel()
         pendingReply.continuation.resume(throwing: CastError.timeout(operation: pendingReply.operation))
     }
 
@@ -226,6 +232,7 @@ actor CastCommandDispatcher {
             return
         }
         pendingReply.timeoutTask?.cancel()
+        pendingReply.sendTask?.cancel()
         pendingReply.continuation.resume(throwing: CancellationError())
     }
 
@@ -234,6 +241,7 @@ actor CastCommandDispatcher {
             return
         }
         pendingReply.timeoutTask?.cancel()
+        pendingReply.sendTask?.cancel()
         pendingReply.continuation.resume(throwing: error)
     }
 
@@ -247,8 +255,21 @@ actor CastCommandDispatcher {
 
         for pendingReply in pending {
             pendingReply.timeoutTask?.cancel()
+            pendingReply.sendTask?.cancel()
             pendingReply.continuation.resume(throwing: error)
         }
+    }
+
+    private func setPendingReplySendTask(
+        _ sendTask: Task<Void, Never>,
+        requestID: CastRequestID
+    ) {
+        guard var pendingReply = pendingReplies[requestID] else {
+            sendTask.cancel()
+            return
+        }
+        pendingReply.sendTask = sendTask
+        pendingReplies[requestID] = pendingReply
     }
 
     // MARK: Encoding / Routing
@@ -417,5 +438,6 @@ private extension CastCommandDispatcher {
         let operation: String
         let continuation: CheckedContinuation<CastInboundMessage, any Error>
         var timeoutTask: Task<Void, Never>?
+        var sendTask: Task<Void, Never>?
     }
 }
