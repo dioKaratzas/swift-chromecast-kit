@@ -7,23 +7,40 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		3AC5474B2F5193EB00477D8A /* ChromecastKit in Frameworks */ = {isa = PBXBuildFile; productRef = 3AC5474A2F5193EB00477D8A /* ChromecastKit */; };
+		3AC5474D2F5193EB00477D8A /* Swifter in Frameworks */ = {isa = PBXBuildFile; productRef = 3AC5474C2F5193EB00477D8A /* Swifter */; };
 		3ADB08D82F4F68500099AEFE /* ChromecastKit in Frameworks */ = {isa = PBXBuildFile; productRef = 3ADB08D72F4F68500099AEFE /* ChromecastKit */; };
 		9F0D01032F5A100000A1B2C3 /* Swifter in Frameworks */ = {isa = PBXBuildFile; productRef = 9F0D01022F5A100000A1B2C3 /* Swifter */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		3ADB089D2F4F66B60099AEFE /* Example.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Example.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		3AC5473E2F51939E00477D8A /* Player.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Player.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		3ADB089D2F4F66B60099AEFE /* Showcase-macOS.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Showcase-macOS.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		3ADB089F2F4F66B60099AEFE /* Example */ = {
+		3AC5473F2F51939E00477D8A /* Player */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			path = Example;
+			path = Player;
+			sourceTree = "<group>";
+		};
+		3ADB089F2F4F66B60099AEFE /* Showcase-macOS */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = "Showcase-macOS";
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		3AC5473B2F51939E00477D8A /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				3AC5474B2F5193EB00477D8A /* ChromecastKit in Frameworks */,
+				3AC5474D2F5193EB00477D8A /* Swifter in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		3ADB089A2F4F66B60099AEFE /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -36,10 +53,19 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		3AC547492F5193EB00477D8A /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
 		3ADB08942F4F66B60099AEFE = {
 			isa = PBXGroup;
 			children = (
-				3ADB089F2F4F66B60099AEFE /* Example */,
+				3ADB089F2F4F66B60099AEFE /* Showcase-macOS */,
+				3AC5473F2F51939E00477D8A /* Player */,
+				3AC547492F5193EB00477D8A /* Frameworks */,
 				3ADB089E2F4F66B60099AEFE /* Products */,
 			);
 			sourceTree = "<group>";
@@ -47,7 +73,8 @@
 		3ADB089E2F4F66B60099AEFE /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				3ADB089D2F4F66B60099AEFE /* Example.app */,
+				3ADB089D2F4F66B60099AEFE /* Showcase-macOS.app */,
+				3AC5473E2F51939E00477D8A /* Player.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -55,9 +82,33 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		3ADB089C2F4F66B60099AEFE /* Example */ = {
+		3AC5473D2F51939E00477D8A /* Player */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 3ADB08A82F4F66B70099AEFE /* Build configuration list for PBXNativeTarget "Example" */;
+			buildConfigurationList = 3AC547462F51939F00477D8A /* Build configuration list for PBXNativeTarget "Player" */;
+			buildPhases = (
+				3AC5473A2F51939E00477D8A /* Sources */,
+				3AC5473B2F51939E00477D8A /* Frameworks */,
+				3AC5473C2F51939E00477D8A /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				3AC5473F2F51939E00477D8A /* Player */,
+			);
+			name = Player;
+			packageProductDependencies = (
+				3AC5474A2F5193EB00477D8A /* ChromecastKit */,
+				3AC5474C2F5193EB00477D8A /* Swifter */,
+			);
+			productName = Player;
+			productReference = 3AC5473E2F51939E00477D8A /* Player.app */;
+			productType = "com.apple.product-type.application";
+		};
+		3ADB089C2F4F66B60099AEFE /* Showcase-macOS */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 3ADB08A82F4F66B70099AEFE /* Build configuration list for PBXNativeTarget "Showcase-macOS" */;
 			buildPhases = (
 				3ADB08992F4F66B60099AEFE /* Sources */,
 				3ADB089A2F4F66B60099AEFE /* Frameworks */,
@@ -68,15 +119,15 @@
 			dependencies = (
 			);
 			fileSystemSynchronizedGroups = (
-				3ADB089F2F4F66B60099AEFE /* Example */,
+				3ADB089F2F4F66B60099AEFE /* Showcase-macOS */,
 			);
-			name = Example;
+			name = "Showcase-macOS";
 			packageProductDependencies = (
 				3ADB08D72F4F68500099AEFE /* ChromecastKit */,
 				9F0D01022F5A100000A1B2C3 /* Swifter */,
 			);
 			productName = Example;
-			productReference = 3ADB089D2F4F66B60099AEFE /* Example.app */;
+			productReference = 3ADB089D2F4F66B60099AEFE /* Showcase-macOS.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -89,6 +140,9 @@
 				LastSwiftUpdateCheck = 2630;
 				LastUpgradeCheck = 2630;
 				TargetAttributes = {
+					3AC5473D2F51939E00477D8A = {
+						CreatedOnToolsVersion = 26.3;
+					};
 					3ADB089C2F4F66B60099AEFE = {
 						CreatedOnToolsVersion = 26.3;
 					};
@@ -112,12 +166,20 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				3ADB089C2F4F66B60099AEFE /* Example */,
+				3ADB089C2F4F66B60099AEFE /* Showcase-macOS */,
+				3AC5473D2F51939E00477D8A /* Player */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		3AC5473C2F51939E00477D8A /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		3ADB089B2F4F66B60099AEFE /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -128,6 +190,13 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		3AC5473A2F51939E00477D8A /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		3ADB08992F4F66B60099AEFE /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -138,6 +207,90 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin XCBuildConfiguration section */
+		3AC547472F51939F00477D8A /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_APP_SANDBOX = NO;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
+				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
+				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
+				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphonesimulator*]" = YES;
+				"INFOPLIST_KEY_UILaunchScreen_Generation[sdk=iphoneos*]" = YES;
+				"INFOPLIST_KEY_UILaunchScreen_Generation[sdk=iphonesimulator*]" = YES;
+				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphoneos*]" = UIStatusBarStyleDefault;
+				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphonesimulator*]" = UIStatusBarStyleDefault;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
+				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
+				MACOSX_DEPLOYMENT_TARGET = 26.2;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "swift-chromecast-kit.player";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				SDKROOT = auto;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				XROS_DEPLOYMENT_TARGET = 26.2;
+			};
+			name = Debug;
+		};
+		3AC547482F51939F00477D8A /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_APP_SANDBOX = NO;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
+				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
+				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
+				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphonesimulator*]" = YES;
+				"INFOPLIST_KEY_UILaunchScreen_Generation[sdk=iphoneos*]" = YES;
+				"INFOPLIST_KEY_UILaunchScreen_Generation[sdk=iphonesimulator*]" = YES;
+				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphoneos*]" = UIStatusBarStyleDefault;
+				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphonesimulator*]" = UIStatusBarStyleDefault;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
+				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
+				MACOSX_DEPLOYMENT_TARGET = 26.2;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "swift-chromecast-kit.player";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				SDKROOT = auto;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				XROS_DEPLOYMENT_TARGET = 26.2;
+			};
+			name = Release;
+		};
 		3ADB08A62F4F66B70099AEFE /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -276,7 +429,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "swift-chromecast-kit.Example";
+				PRODUCT_BUNDLE_IDENTIFIER = "swift-chromecast-kit.showcase-macos";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -308,7 +461,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "swift-chromecast-kit.Example";
+				PRODUCT_BUNDLE_IDENTIFIER = "swift-chromecast-kit.showcase-macos";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -323,6 +476,15 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		3AC547462F51939F00477D8A /* Build configuration list for PBXNativeTarget "Player" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				3AC547472F51939F00477D8A /* Debug */,
+				3AC547482F51939F00477D8A /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		3ADB08982F4F66B60099AEFE /* Build configuration list for PBXProject "Example" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
@@ -332,7 +494,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		3ADB08A82F4F66B70099AEFE /* Build configuration list for PBXNativeTarget "Example" */ = {
+		3ADB08A82F4F66B70099AEFE /* Build configuration list for PBXNativeTarget "Showcase-macOS" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				3ADB08A92F4F66B70099AEFE /* Debug */,
@@ -362,6 +524,16 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		3AC5474A2F5193EB00477D8A /* ChromecastKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 3ADB08D62F4F68500099AEFE /* XCLocalSwiftPackageReference "../../ChromecastKit" */;
+			productName = ChromecastKit;
+		};
+		3AC5474C2F5193EB00477D8A /* Swifter */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 9F0D01012F5A100000A1B2C3 /* XCRemoteSwiftPackageReference "swifter" */;
+			productName = Swifter;
+		};
 		3ADB08D72F4F68500099AEFE /* ChromecastKit */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = ChromecastKit;
