@@ -12,7 +12,7 @@ import Foundation
 struct CastSessionPublicAPITests {
     @Test("sendAndAwaitReply returns typed namespace message")
     func sendAndAwaitReply() async throws {
-        let transport = PublicSessionTestTransport()
+        let transport = CastSessionTestTransport()
         let runtime = CastSessionRuntime(
             device: .init(id: "device-1", friendlyName: "Living Room", host: "192.168.1.10"),
             transport: transport,
@@ -54,7 +54,7 @@ struct CastSessionPublicAPITests {
 
     @Test("namespaceEvents emits binary custom namespace payloads")
     func namespaceEventsBinary() async throws {
-        let transport = PublicSessionTestTransport()
+        let transport = CastSessionTestTransport()
         let runtime = CastSessionRuntime(
             device: .init(id: "device-1", friendlyName: "Living Room", host: "192.168.1.10"),
             transport: transport,
@@ -87,7 +87,7 @@ struct CastSessionPublicAPITests {
 
     @Test("namespaceEvents decodes binary JSON payloads when bytes are UTF-8")
     func namespaceEventsBinaryJSONDecode() async throws {
-        let transport = PublicSessionTestTransport()
+        let transport = CastSessionTestTransport()
         let runtime = CastSessionRuntime(
             device: .init(id: "device-1", friendlyName: "Living Room", host: "192.168.1.10"),
             transport: transport,
@@ -121,7 +121,7 @@ struct CastSessionPublicAPITests {
 
     @Test("namespace handler registry routes filtered custom events")
     func namespaceHandlerRegistry() async throws {
-        let transport = PublicSessionTestTransport()
+        let transport = CastSessionTestTransport()
         let runtime = CastSessionRuntime(
             device: .init(id: "device-1", friendlyName: "Living Room", host: "192.168.1.10"),
             transport: transport,
@@ -185,7 +185,7 @@ struct CastSessionPublicAPITests {
 
     @Test("session controller registry receives lifecycle and namespace events")
     func sessionControllerRegistry() async throws {
-        let transport = PublicSessionTestTransport()
+        let transport = CastSessionTestTransport()
         let runtime = CastSessionRuntime(
             device: .init(id: "device-1", friendlyName: "Living Room", host: "192.168.1.10"),
             transport: transport,
@@ -235,7 +235,7 @@ struct CastSessionPublicAPITests {
 
     @Test("registerControllers registers multiple controllers in order")
     func registerControllersBatch() async {
-        let transport = PublicSessionTestTransport()
+        let transport = CastSessionTestTransport()
         let runtime = CastSessionRuntime(
             device: .init(id: "device-1", friendlyName: "Living Room", host: "192.168.1.10"),
             transport: transport,
@@ -258,7 +258,7 @@ struct CastSessionPublicAPITests {
 
     @Test("unregisterNamespaceHandler cleans up controller token registrations")
     func unregisterNamespaceHandlerWithControllerToken() async throws {
-        let transport = PublicSessionTestTransport()
+        let transport = CastSessionTestTransport()
         let runtime = CastSessionRuntime(
             device: .init(id: "device-1", friendlyName: "Living Room", host: "192.168.1.10"),
             transport: transport,
@@ -298,7 +298,7 @@ struct CastSessionPublicAPITests {
 
     @Test("waitForApp returns active app when receiver status reports transport ready")
     func waitForApp() async throws {
-        let transport = PublicSessionTestTransport()
+        let transport = CastSessionTestTransport()
         let runtime = CastSessionRuntime(
             device: .init(id: "device-1", friendlyName: "Living Room", host: "192.168.1.10"),
             transport: transport,
@@ -330,7 +330,7 @@ struct CastSessionPublicAPITests {
 
     @Test("waitForNamespace returns true when active app reports support")
     func waitForNamespace() async throws {
-        let transport = PublicSessionTestTransport()
+        let transport = CastSessionTestTransport()
         let runtime = CastSessionRuntime(
             device: .init(id: "device-1", friendlyName: "Living Room", host: "192.168.1.10"),
             transport: transport,
@@ -361,7 +361,7 @@ struct CastSessionPublicAPITests {
 
     @Test("waitForApp respects task cancellation")
     func waitForAppCancellation() async throws {
-        let transport = PublicSessionTestTransport()
+        let transport = CastSessionTestTransport()
         let runtime = CastSessionRuntime(
             device: .init(id: "device-1", friendlyName: "Living Room", host: "192.168.1.10"),
             transport: transport,
@@ -389,7 +389,7 @@ struct CastSessionPublicAPITests {
 
     @Test("connectIfNeeded avoids duplicate connect when already connected")
     func connectIfNeededIsIdempotent() async throws {
-        let transport = PublicSessionTestTransport()
+        let transport = CastSessionTestTransport()
         let runtime = CastSessionRuntime(
             device: .init(id: "device-1", friendlyName: "Living Room", host: "192.168.1.10"),
             transport: transport,
@@ -406,7 +406,7 @@ struct CastSessionPublicAPITests {
 
     @Test("launchDefaultMediaReceiver sends receiver launch with built-in app id")
     func launchDefaultMediaReceiver() async throws {
-        let transport = PublicSessionTestTransport()
+        let transport = CastSessionTestTransport()
         let runtime = CastSessionRuntime(
             device: .init(id: "device-1", friendlyName: "Living Room", host: "192.168.1.10"),
             transport: transport,
@@ -438,7 +438,7 @@ struct CastSessionPublicAPITests {
 
     @Test("youtube controller refreshSessionStatus captures mdx screen id")
     func youtubeControllerRefreshSessionStatus() async throws {
-        let transport = PublicSessionTestTransport()
+        let transport = CastSessionTestTransport()
         let runtime = CastSessionRuntime(
             device: .init(id: "device-1", friendlyName: "Living Room", host: "192.168.1.10"),
             transport: transport,
@@ -474,7 +474,7 @@ struct CastSessionPublicAPITests {
 
     @Test("youtube controller quickPlay uses pychromecast-style MDX web flow")
     func youtubeControllerQuickPlayUsesMDXWebSession() async throws {
-        let transport = PublicSessionTestTransport()
+        let transport = CastSessionTestTransport()
         let runtime = CastSessionRuntime(
             device: .init(id: "device-1", friendlyName: "Living Room", host: "192.168.1.10"),
             transport: transport,
@@ -561,38 +561,30 @@ struct CastSessionPublicAPITests {
     }
 
     private func waitForCommand(
-        on transport: PublicSessionTestTransport,
+        on transport: CastSessionTestTransport,
         requestID: CastRequestID,
         timeout: TimeInterval = 0.5
     ) async -> CastEncodedCommand? {
-        let deadline = Date().addingTimeInterval(timeout)
-        while Date() < deadline {
+        _ = await TestPolling.waitUntil(timeout: timeout) {
             let commands = await transport.commands()
-            if let command = commands.first(where: { $0.requestID == requestID }) {
-                return command
-            }
-            try? await Task.sleep(nanoseconds: 1_000_000)
+            return commands.contains(where: { $0.requestID == requestID })
         }
-        return await (transport.commands()).first(where: { $0.requestID == requestID })
+        return await transport.commands().first(where: { $0.requestID == requestID })
     }
 
     private func waitForCommand(
-        on transport: PublicSessionTestTransport,
+        on transport: CastSessionTestTransport,
         namespace: CastNamespace,
         timeout: TimeInterval = 0.5
     ) async -> CastEncodedCommand? {
-        let deadline = Date().addingTimeInterval(timeout)
-        while Date() < deadline {
+        _ = await TestPolling.waitUntil(timeout: timeout) {
             let commands = await transport.commands()
-            if let command = commands.last(where: { $0.route.namespace == namespace }) {
-                return command
-            }
-            try? await Task.sleep(nanoseconds: 1_000_000)
+            return commands.contains(where: { $0.route.namespace == namespace })
         }
-        return await (transport.commands()).last(where: { $0.route.namespace == namespace })
+        return await transport.commands().last(where: { $0.route.namespace == namespace })
     }
 
-    private func emitYouTubeReceiverReadyStatus(on transport: PublicSessionTestTransport) async {
+    private func emitYouTubeReceiverReadyStatus(on transport: CastSessionTestTransport) async {
         await transport.emitInboundEvent(
             .utf8(
                 .init(
@@ -603,7 +595,7 @@ struct CastSessionPublicAPITests {
         )
     }
 
-    private func emitYouTubeMDXSessionStatus(on transport: PublicSessionTestTransport, screenID: String) async {
+    private func emitYouTubeMDXSessionStatus(on transport: CastSessionTestTransport, screenID: String) async {
         await transport.emitInboundEvent(
             .utf8(
                 .init(
@@ -618,17 +610,15 @@ struct CastSessionPublicAPITests {
         on session: CastSession,
         timeout: TimeInterval = 0.5
     ) async -> Bool {
-        let deadline = Date().addingTimeInterval(timeout)
-        while Date() < deadline {
+        await TestPolling.waitUntil(timeout: timeout) {
             if let app = await session.receiverStatus()?.app,
                app.appID == .youtube,
                app.transportID != nil,
                app.namespaces.contains(CastNamespace.youtubeMDX.rawValue) {
                 return true
             }
-            try? await Task.sleep(nanoseconds: 1_000_000)
+            return false
         }
-        return false
     }
 
     private func extractRequestID(_ value: JSONValue) -> Int? {
@@ -643,13 +633,8 @@ struct CastSessionPublicAPITests {
         count: Int,
         timeout: TimeInterval = 0.5
     ) async -> Int? {
-        let deadline = Date().addingTimeInterval(timeout)
-        while Date() < deadline {
-            let current = await handler.events().count
-            if current >= count {
-                return current
-            }
-            try? await Task.sleep(nanoseconds: 1_000_000)
+        _ = await TestPolling.waitUntil(timeout: timeout) {
+            await handler.events().count >= count
         }
         return await handler.events().count
     }
@@ -660,14 +645,9 @@ struct CastSessionPublicAPITests {
         atLeast count: Int,
         timeout: TimeInterval = 0.75
     ) async -> Int? {
-        let deadline = Date().addingTimeInterval(timeout)
-        while Date() < deadline {
+        _ = await TestPolling.waitUntil(timeout: timeout) {
             let snapshot = await controller.counts()
-            let value = snapshot[keyPath: keyPath]
-            if value >= count {
-                return value
-            }
-            try? await Task.sleep(nanoseconds: 1_000_000)
+            return snapshot[keyPath: keyPath] >= count
         }
         let snapshot = await controller.counts()
         return snapshot[keyPath: keyPath]
@@ -737,85 +717,6 @@ private actor RecordingSessionController: CastSessionController {
 
     func willUnregisterCount() -> Int {
         countsSnapshot.willUnregisterCount
-    }
-}
-
-private actor PublicSessionTestTransport: CastConnectionTransport, CastCommandTransport, CastInboundEventTransport {
-    private var connectCount = 0
-    private var disconnectCount = 0
-    private var sentCommands = [CastEncodedCommand]()
-    private var inboundEventContinuations = [UUID: AsyncStream<CastInboundTransportEvent>.Continuation]()
-
-    func connect(timeout _: TimeInterval) async throws {
-        connectCount += 1
-    }
-
-    func disconnect() async {
-        disconnectCount += 1
-        for continuation in inboundEventContinuations.values {
-            continuation.finish()
-        }
-        inboundEventContinuations.removeAll(keepingCapacity: false)
-    }
-
-    func send(_ command: CastEncodedCommand) async throws {
-        sentCommands.append(command)
-        try autoReplyBootstrapReceiverStatusIfNeeded(for: command)
-    }
-
-    func inboundEvents() async -> AsyncStream<CastInboundTransportEvent> {
-        let id = UUID()
-        return AsyncStream { continuation in
-            inboundEventContinuations[id] = continuation
-            continuation.onTermination = { [id] _ in
-                Task { await self.removeInboundEventContinuation(id: id) }
-            }
-        }
-    }
-
-    func emitInboundEvent(_ event: CastInboundTransportEvent) {
-        for continuation in inboundEventContinuations.values {
-            continuation.yield(event)
-        }
-    }
-
-    func commands() -> [CastEncodedCommand] {
-        sentCommands
-    }
-
-    func connectCallCount() -> Int {
-        connectCount
-    }
-
-    private func removeInboundEventContinuation(id: UUID) {
-        inboundEventContinuations[id] = nil
-    }
-
-    private func autoReplyBootstrapReceiverStatusIfNeeded(for command: CastEncodedCommand) throws {
-        guard command.route.namespace == .receiver else {
-            return
-        }
-        guard case let .utf8(payloadUTF8) = command.payload else {
-            return
-        }
-
-        let json = try JSONDecoder().decode([String: JSONValue].self, from: Data(payloadUTF8.utf8))
-        guard json["type"] == .string("GET_STATUS") else {
-            return
-        }
-        guard case let .number(requestID)? = json["requestId"] else {
-            return
-        }
-
-        let reply = CastInboundTransportEvent.utf8(
-            .init(
-                route: .init(sourceID: "receiver-0", destinationID: "sender-0", namespace: .receiver),
-                payloadUTF8: #"{"type":"RECEIVER_STATUS","requestId":\#(Int(requestID)),"status":{"volume":{"level":0.5,"muted":false}}}"#
-            )
-        )
-        for continuation in inboundEventContinuations.values {
-            continuation.yield(reply)
-        }
     }
 }
 

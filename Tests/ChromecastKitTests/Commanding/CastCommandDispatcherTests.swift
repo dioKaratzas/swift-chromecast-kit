@@ -397,12 +397,8 @@ struct CastCommandDispatcherTests {
         on transport: RecordingCommandTransport,
         timeout: TimeInterval = 0.5
     ) async -> CastEncodedCommand? {
-        let deadline = Date().addingTimeInterval(timeout)
-        while Date() < deadline {
-            if let command = await transport.commands().first {
-                return command
-            }
-            try? await Task.sleep(nanoseconds: 1_000_000)
+        _ = await TestPolling.waitUntil(timeout: timeout) {
+            await transport.commands().isEmpty == false
         }
         return await transport.commands().first
     }

@@ -12,7 +12,7 @@ import Foundation
 struct CastSessionTests {
     @Test("connect and disconnect proxy connection lifecycle and events")
     func lifecycle() async throws {
-        let transport = TestSessionTransport()
+        let transport = CastSessionTestTransport()
         let device = CastDeviceDescriptor(
             id: "device-1",
             friendlyName: "Living Room",
@@ -37,7 +37,7 @@ struct CastSessionTests {
 
     @Test("connect bootstraps platform connection and receiver status")
     func connectBootstrapsPlatformNamespaces() async throws {
-        let transport = TestSessionTransport()
+        let transport = CastSessionTestTransport()
         let device = CastDeviceDescriptor(
             id: "device-1",
             friendlyName: "Living Room",
@@ -73,7 +73,7 @@ struct CastSessionTests {
 
     @Test("inbound statuses update snapshot and enable media session-bound commands")
     func statusProcessingAndCommands() async throws {
-        let transport = TestSessionTransport()
+        let transport = CastSessionTestTransport()
         let device = CastDeviceDescriptor(
             id: "device-1",
             friendlyName: "Living Room",
@@ -115,7 +115,7 @@ struct CastSessionTests {
 
     @Test("receiver status bootstraps active app transport connection and media status request")
     func receiverStatusBootstrapsAppTransport() async throws {
-        let transport = TestSessionTransport()
+        let transport = CastSessionTestTransport()
         let device = CastDeviceDescriptor(
             id: "device-1",
             friendlyName: "Living Room",
@@ -160,7 +160,7 @@ struct CastSessionTests {
 
     @Test("receiver status app bootstrap failure emits error and disconnects")
     func receiverStatusAppBootstrapFailureTriggersRecovery() async throws {
-        let transport = TestSessionTransport()
+        let transport = CastSessionTestTransport()
         let device = CastDeviceDescriptor(
             id: "device-1",
             friendlyName: "Living Room",
@@ -201,7 +201,7 @@ struct CastSessionTests {
 
     @Test("heartbeat ping messages are answered with pong")
     func heartbeatPingRespondsWithPong() async throws {
-        let transport = TestSessionTransport()
+        let transport = CastSessionTestTransport()
         let device = CastDeviceDescriptor(
             id: "device-1",
             friendlyName: "Living Room",
@@ -232,7 +232,7 @@ struct CastSessionTests {
 
     @Test("heartbeat timeout disconnects when auto reconnect is disabled")
     func heartbeatTimeoutDisconnectsWithoutReconnect() async throws {
-        let transport = TestSessionTransport()
+        let transport = CastSessionTestTransport()
         let device = CastDeviceDescriptor(
             id: "device-1",
             friendlyName: "Living Room",
@@ -256,7 +256,7 @@ struct CastSessionTests {
 
     @Test("bootstrap command failure disconnects and emits error")
     func bootstrapFailureDisconnectsSession() async throws {
-        let transport = TestSessionTransport()
+        let transport = CastSessionTestTransport()
         await transport.failNextSend(
             matching: .receiver,
             with: .connectionFailed("bootstrap get status failed")
@@ -293,7 +293,7 @@ struct CastSessionTests {
 
     @Test("heartbeat send failure triggers network recovery when auto reconnect is disabled")
     func heartbeatSendFailureTriggersRecovery() async throws {
-        let transport = TestSessionTransport()
+        let transport = CastSessionTestTransport()
         let device = CastDeviceDescriptor(
             id: "device-1",
             friendlyName: "Living Room",
@@ -327,7 +327,7 @@ struct CastSessionTests {
 
     @Test("custom namespace messages are emitted to namespace subscribers")
     func customNamespaceMessagesStream() async throws {
-        let transport = TestSessionTransport()
+        let transport = CastSessionTestTransport()
         let device = CastDeviceDescriptor(
             id: "device-1",
             friendlyName: "Living Room",
@@ -359,7 +359,7 @@ struct CastSessionTests {
 
     @Test("custom binary namespace messages are emitted to namespace event subscribers")
     func customBinaryNamespaceEventsStream() async throws {
-        let transport = TestSessionTransport()
+        let transport = CastSessionTestTransport()
         let device = CastDeviceDescriptor(
             id: "device-1",
             friendlyName: "Living Room",
@@ -401,7 +401,7 @@ struct CastSessionTests {
 
     @Test("disconnect fails pending request waiters immediately")
     func disconnectFailsPendingRequestWaiters() async throws {
-        let transport = TestSessionTransport()
+        let transport = CastSessionTestTransport()
         let device = CastDeviceDescriptor(
             id: "device-1",
             friendlyName: "Living Room",
@@ -444,7 +444,7 @@ struct CastSessionTests {
 
     @Test("transport closed event disconnects and auto reconnects when enabled")
     func transportClosedAutoReconnects() async throws {
-        let transport = TestSessionTransport()
+        let transport = CastSessionTestTransport()
         let device = CastDeviceDescriptor(
             id: "device-1",
             friendlyName: "Living Room",
@@ -476,7 +476,7 @@ struct CastSessionTests {
 
     @Test("auto reconnect retries after transient reconnect connect failure")
     func autoReconnectRetriesAfterConnectFailure() async throws {
-        let transport = TestSessionTransport()
+        let transport = CastSessionTestTransport()
         let device = CastDeviceDescriptor(
             id: "device-1",
             friendlyName: "Living Room",
@@ -516,7 +516,7 @@ struct CastSessionTests {
 
     @Test("transport failure emits connection error and disconnect when auto reconnect is disabled")
     func transportFailureEmitsErrorAndDisconnects() async throws {
-        let transport = TestSessionTransport()
+        let transport = CastSessionTestTransport()
         let device = CastDeviceDescriptor(
             id: "device-1",
             friendlyName: "Living Room",
@@ -549,7 +549,7 @@ struct CastSessionTests {
 
     @Test("auto reconnect respects reconnect max attempt cap")
     func autoReconnectRespectsMaxAttempts() async throws {
-        let transport = TestSessionTransport()
+        let transport = CastSessionTestTransport()
         let device = CastDeviceDescriptor(
             id: "device-1",
             friendlyName: "Living Room",
@@ -585,7 +585,7 @@ struct CastSessionTests {
 
     @Test("receiver-only restoration policy skips app/media transport bootstrap")
     func receiverOnlyRestorationSkipsMediaBootstrap() async throws {
-        let transport = TestSessionTransport()
+        let transport = CastSessionTestTransport()
         let device = CastDeviceDescriptor(
             id: "device-1",
             friendlyName: "Living Room",
@@ -627,7 +627,7 @@ struct CastSessionTests {
 
     @Test("observability callbacks receive reconnect recovery events")
     func observabilityReceivesRecoveryEvents() async throws {
-        let transport = TestSessionTransport()
+        let transport = CastSessionTestTransport()
         let collector = SessionObservabilityCollector()
         let device = CastDeviceDescriptor(
             id: "device-1",
@@ -675,7 +675,7 @@ struct CastSessionTests {
 
     @Test("observability receives inbound runtime processing error diagnostics")
     func observabilityReceivesInboundRuntimeErrors() async throws {
-        let transport = TestSessionTransport()
+        let transport = CastSessionTestTransport()
         let collector = SessionObservabilityCollector()
         let device = CastDeviceDescriptor(
             id: "device-1",
@@ -708,14 +708,8 @@ struct CastSessionTests {
             )
         )
 
-        let deadline = Date().addingTimeInterval(0.5)
-        var sawRuntimeErrorLog = false
-        while Date() < deadline {
-            if collector.logCodes().contains("inbound_event_ignored") {
-                sawRuntimeErrorLog = true
-                break
-            }
-            try? await Task.sleep(nanoseconds: 1_000_000)
+        let sawRuntimeErrorLog = await TestPolling.waitUntil(timeout: 0.5) {
+            collector.logCodes().contains("inbound_event_ignored")
         }
 
         #expect(sawRuntimeErrorLog)
@@ -730,100 +724,6 @@ struct CastSessionTests {
             throw CastError.invalidResponse("Missing connection event")
         }
         return event
-    }
-}
-
-private actor TestSessionTransport: CastConnectionTransport, CastCommandTransport, CastInboundEventTransport {
-    private(set) var connectCount = 0
-    private(set) var disconnectCount = 0
-    private var sentCommands = [CastEncodedCommand]()
-    private var inboundEventContinuations = [UUID: AsyncStream<CastInboundTransportEvent>.Continuation]()
-    private var nextSendFailures = [CastNamespace: CastError]()
-    private var nextConnectFailures = [CastError]()
-
-    func connect(timeout _: TimeInterval) async throws {
-        connectCount += 1
-        if nextConnectFailures.isEmpty == false {
-            throw nextConnectFailures.removeFirst()
-        }
-    }
-
-    func disconnect() async {
-        disconnectCount += 1
-        for continuation in inboundEventContinuations.values {
-            continuation.finish()
-        }
-        inboundEventContinuations.removeAll(keepingCapacity: false)
-    }
-
-    func send(_ command: CastEncodedCommand) async throws {
-        if let error = nextSendFailures.removeValue(forKey: command.route.namespace) {
-            throw error
-        }
-        sentCommands.append(command)
-        try autoReplyBootstrapReceiverStatusIfNeeded(for: command)
-    }
-
-    func inboundEvents() async -> AsyncStream<CastInboundTransportEvent> {
-        let id = UUID()
-        return AsyncStream { continuation in
-            inboundEventContinuations[id] = continuation
-            continuation.onTermination = { [id] _ in
-                Task { await self.removeInboundEventContinuation(id: id) }
-            }
-        }
-    }
-
-    func emitInboundEvent(_ event: CastInboundTransportEvent) {
-        for continuation in inboundEventContinuations.values {
-            continuation.yield(event)
-        }
-    }
-
-    func commands() -> [CastEncodedCommand] {
-        sentCommands
-    }
-
-    func lifecycle() -> (connects: Int, disconnects: Int) {
-        (connectCount, disconnectCount)
-    }
-
-    func failNextSend(matching namespace: CastNamespace, with error: CastError) {
-        nextSendFailures[namespace] = error
-    }
-
-    func failNextConnect(with error: CastError) {
-        nextConnectFailures.append(error)
-    }
-
-    private func removeInboundEventContinuation(id: UUID) {
-        inboundEventContinuations[id] = nil
-    }
-
-    private func autoReplyBootstrapReceiverStatusIfNeeded(for command: CastEncodedCommand) throws {
-        guard command.route.namespace == .receiver else {
-            return
-        }
-        guard case let .utf8(payloadUTF8) = command.payload else {
-            return
-        }
-        let json = try JSONDecoder().decode([String: JSONValue].self, from: Data(payloadUTF8.utf8))
-        guard json["type"] == .string("GET_STATUS") else {
-            return
-        }
-        guard case let .number(requestID)? = json["requestId"] else {
-            return
-        }
-
-        let reply = CastInboundTransportEvent.utf8(
-            .init(
-                route: .init(sourceID: "receiver-0", destinationID: "sender-0", namespace: .receiver),
-                payloadUTF8: #"{"type":"RECEIVER_STATUS","requestId":\#(Int(requestID)),"status":{"volume":{"level":0.5,"muted":false}}}"#
-            )
-        )
-        for continuation in inboundEventContinuations.values {
-            continuation.yield(reply)
-        }
     }
 }
 

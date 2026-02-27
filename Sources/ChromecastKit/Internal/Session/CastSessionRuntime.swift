@@ -147,25 +147,15 @@ actor CastSessionRuntime {
     }
 
     func disconnect(reason: CastConnection.DisconnectReason = .requested) async {
-        inboundTask?.cancel()
-        inboundTask = nil
-        heartbeatTask?.cancel()
-        heartbeatTask = nil
-        recoveryTask?.cancel()
-        recoveryTask = nil
-        connectedApplicationTransportID = nil
+        resetRuntimeLoops(cancelRecoveryTask: true)
+        resetApplicationTransportContext()
         await dispatcher.failAllPendingReplies(with: CastError.disconnected)
         await connection.disconnect(reason: reason)
     }
 
     func reconnect() async throws {
-        inboundTask?.cancel()
-        inboundTask = nil
-        heartbeatTask?.cancel()
-        heartbeatTask = nil
-        recoveryTask?.cancel()
-        recoveryTask = nil
-        connectedApplicationTransportID = nil
+        resetRuntimeLoops(cancelRecoveryTask: true)
+        resetApplicationTransportContext()
         try await connection.reconnect()
         do {
             try await finishPostConnectBootstrap()
@@ -487,11 +477,8 @@ actor CastSessionRuntime {
             attributes: ["reason": reason.rawValue]
         )
 
-        inboundTask?.cancel()
-        inboundTask = nil
-        heartbeatTask?.cancel()
-        heartbeatTask = nil
-        connectedApplicationTransportID = nil
+        resetRuntimeLoops()
+        resetApplicationTransportContext()
         await dispatcher.failAllPendingReplies(with: CastError.disconnected)
 
         await connection.disconnect(reason: reason)
@@ -725,11 +712,8 @@ actor CastSessionRuntime {
 
     private func handleBootstrapFailure(_ error: any Error) async {
         let castError = (error as? CastError) ?? .connectionFailed(String(describing: error))
-        inboundTask?.cancel()
-        inboundTask = nil
-        heartbeatTask?.cancel()
-        heartbeatTask = nil
-        connectedApplicationTransportID = nil
+        resetRuntimeLoops()
+        resetApplicationTransportContext()
         await dispatcher.failAllPendingReplies(with: castError)
         await connection.reportRuntimeError(castError)
         await connection.disconnect(reason: .networkError)
@@ -767,6 +751,21 @@ actor CastSessionRuntime {
             dimensions["namespace"] = namespace.rawValue
         }
         emitMetric(name: "cast.session.runtime.inbound_error", value: 1, unit: "count", dimensions: dimensions)
+    }
+
+    private func resetRuntimeLoops(cancelRecoveryTask: Bool = false) {
+        inboundTask?.cancel()
+        inboundTask = nil
+        heartbeatTask?.cancel()
+        heartbeatTask = nil
+        if cancelRecoveryTask {
+            recoveryTask?.cancel()
+            recoveryTask = nil
+        }
+    }
+
+    private func resetApplicationTransportContext() {
+        connectedApplicationTransportID = nil
     }
 
     private func emitRecoveryLog(
