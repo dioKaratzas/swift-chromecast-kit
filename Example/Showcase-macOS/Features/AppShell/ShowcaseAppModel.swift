@@ -67,7 +67,7 @@ final class ShowcaseAppModel {
     var subtitleStylePreset = SubtitleStylePreset.none
 
     // YouTube MDX demo
-    var youtubeVideoID = "dQw4w9WgXcQ"
+    var youtubeVideoID = "FLTchCiC0T0"
     var youtubePlaylistID = ""
     var youtubeStartTimeText = "0"
     var youtubeEnqueue = false
