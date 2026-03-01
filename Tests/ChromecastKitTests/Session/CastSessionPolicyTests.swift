@@ -78,4 +78,16 @@ struct CastSessionPolicyTests {
         #expect(configuration.reconnectPolicy.initialDelay == 3)
         #expect(configuration.reconnectRetryDelay == 3)
     }
+
+    @Test("configuration defaults runtime logging to error")
+    func configurationDefaultLogLevel() {
+        let configuration = CastSession.Configuration()
+        #expect(configuration.logLevel == .error)
+    }
+
+    @Test("configuration stores explicit runtime logging level")
+    func configurationCustomLogLevel() {
+        let configuration = CastSession.Configuration(logLevel: .trace)
+        #expect(configuration.logLevel == .trace)
+    }
 }

@@ -19,6 +19,7 @@ actor SSDPCastDiscoveryBrowser: CastDiscoveryBrowser {
 
     private let callbackQueue = DispatchQueue(label: "ChromecastKit.Discovery.SSDP")
 
+    private var logger = ChromecastKitDiagnosticsLogger(level: .error, category: .discovery)
     private var configuration = CastDiscovery.Configuration()
     private var connection: NWConnection?
     private var isRunning = false
@@ -41,10 +42,13 @@ actor SSDPCastDiscoveryBrowser: CastDiscoveryBrowser {
 
     func start(configuration: CastDiscovery.Configuration) async throws {
         guard isRunning == false else {
+            logger.trace("SSDP browser start ignored: already running")
             return
         }
         isRunning = true
         self.configuration = configuration
+        logger.setLevel(configuration.logLevel)
+        logger.debug("starting SSDP fallback browser")
 
         let params = NWParameters.udp
         params.includePeerToPeer = false
@@ -60,7 +64,10 @@ actor SSDPCastDiscoveryBrowser: CastDiscoveryBrowser {
         connection.stateUpdateHandler = { state in
             switch state {
             case let .failed(error):
-                Task { await self.emit(.error(.discoveryFailed("SSDP failed: \(error)"))) }
+                Task {
+                    await self.logWarning("SSDP connection failed: \(error)")
+                    await self.emit(.error(.discoveryFailed("SSDP failed: \(error)")))
+                }
             default:
                 break
             }
@@ -74,6 +81,7 @@ actor SSDPCastDiscoveryBrowser: CastDiscoveryBrowser {
             try await sendSearchRequest()
         } catch {
             // keep backend alive; periodic retries may recover.
+            logger.warning("initial SSDP search request failed: \(error)")
             emit(.error(error as? CastError ?? .discoveryFailed(String(describing: error))))
         }
     }
@@ -89,6 +97,7 @@ actor SSDPCastDiscoveryBrowser: CastDiscoveryBrowser {
         connection?.cancel()
         connection = nil
         knownLocations.removeAll(keepingCapacity: false)
+        logger.debug("stopped SSDP fallback browser")
     }
 
     // MARK: Polling / Receive
@@ -111,6 +120,7 @@ actor SSDPCastDiscoveryBrowser: CastDiscoveryBrowser {
                     self.expireKnownLocationsIfNeeded()
                     try await self.sendSearchRequest()
                 } catch {
+                    self.logger.warning("SSDP polling send failed: \(error)")
                     self.emit(.error(error as? CastError ?? .discoveryFailed(String(describing: error))))
                 }
             }
@@ -123,7 +133,10 @@ actor SSDPCastDiscoveryBrowser: CastDiscoveryBrowser {
         }
         connection.receiveMessage { data, _, _, error in
             if let error {
-                Task { await self.emit(.error(.discoveryFailed("SSDP receive failed: \(error)"))) }
+                Task {
+                    await self.logWarning("SSDP receive failed: \(error)")
+                    await self.emit(.error(.discoveryFailed("SSDP receive failed: \(error)")))
+                }
             }
             if let data, data.isEmpty == false {
                 Task { await self.handleDatagram(data) }
@@ -191,6 +204,7 @@ actor SSDPCastDiscoveryBrowser: CastDiscoveryBrowser {
                 return
             } catch {
                 // Best effort fallback, ignore individual failures.
+                self.logger.debug("SSDP device detail fetch failed: \(error)")
             }
         }
     }
@@ -206,6 +220,7 @@ actor SSDPCastDiscoveryBrowser: CastDiscoveryBrowser {
             cacheMaxAge: cacheMaxAge
         )
         emit(.deviceUpserted(descriptor))
+        logger.trace("SSDP discovered device '\(descriptor.friendlyName)' at \(locationURL.absoluteString)")
     }
 
     // MARK: Expiry / Task Cleanup
@@ -218,6 +233,7 @@ actor SSDPCastDiscoveryBrowser: CastDiscoveryBrowser {
     private func expireKnownLocationsIfNeeded(now: Date = .init()) {
         for deviceID in knownLocations.expire(now: now) {
             emit(.deviceRemoved(deviceID))
+            logger.trace("expired SSDP location for device id=\(deviceID.rawValue)")
         }
     }
 
@@ -246,6 +262,10 @@ actor SSDPCastDiscoveryBrowser: CastDiscoveryBrowser {
 
     private func removeContinuation(id: UUID) {
         eventContinuations[id] = nil
+    }
+
+    private func logWarning(_ message: String) {
+        logger.warning(message)
     }
 }
 

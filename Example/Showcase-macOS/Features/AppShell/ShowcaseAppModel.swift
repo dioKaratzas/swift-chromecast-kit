@@ -12,7 +12,7 @@ import ChromecastKit
 @MainActor
 @Observable
 final class ShowcaseAppModel {
-    private let discovery: CastDiscovery
+    private var discovery: CastDiscovery
     private let localFileServer = CastLocalFileServer()
     private let youtubeController = CastYouTubeController()
 
@@ -38,12 +38,28 @@ final class ShowcaseAppModel {
     var latestUserError: String?
     var isBusyConnecting = false
 
+    var discoveryConfiguration = CastDiscovery.Configuration(
+        includeGroups: true,
+        browseTimeout: nil,
+        enableSSDPFallback: true,
+        logLevel: .error
+    ) {
+        didSet {
+            if discoveryConfiguration != oldValue {
+                Task { @MainActor [weak self] in
+                    await self?.applyDiscoveryConfigurationChange()
+                }
+            }
+        }
+    }
+
     var sessionConfiguration = CastSession.Configuration(
         connectTimeout: 10,
         commandTimeout: 10,
         heartbeatInterval: 5,
         autoReconnect: true,
-        reconnectRetryDelay: 1
+        reconnectRetryDelay: 1,
+        logLevel: .error
     )
 
     // Receiver controls
@@ -94,15 +110,16 @@ final class ShowcaseAppModel {
     var manualHostFriendlyName = ""
 
     init(
-        discovery: CastDiscovery = CastDiscovery(
-            configuration: .init(
-                includeGroups: true,
-                browseTimeout: nil,
-                enableSSDPFallback: true
-            )
-        )
+        discoveryConfiguration: CastDiscovery.Configuration = .init(
+            includeGroups: true,
+            browseTimeout: nil,
+            enableSSDPFallback: true,
+            logLevel: .error
+        ),
+        discovery: CastDiscovery? = nil
     ) {
-        self.discovery = discovery
+        self.discoveryConfiguration = discoveryConfiguration
+        self.discovery = discovery ?? CastDiscovery(configuration: discoveryConfiguration)
     }
 
     var selectedDevice: CastDeviceDescriptor? {
@@ -208,6 +225,20 @@ final class ShowcaseAppModel {
             appendDiscoveryLog("Start failed: \(message)")
             await refreshDiscoverySnapshot()
         }
+    }
+
+    private func applyDiscoveryConfigurationChange() async {
+        let currentState = await discovery.state()
+        guard currentState != .running, currentState != .starting else {
+            appendDiscoveryLog("Stop discovery before changing discovery log level.")
+            return
+        }
+
+        discoveryEventsTask?.cancel()
+        discoveryEventsTask = nil
+        discovery = CastDiscovery(configuration: discoveryConfiguration)
+        await refreshDiscoverySnapshot()
+        startDiscoveryEventsIfNeeded()
     }
 
     private func stopDiscovery() async {

@@ -131,108 +131,6 @@ public extension CastSession {
         case receiverAndMedia
     }
 
-    /// Session observability callbacks for logs, metrics, and traces.
-    struct Observability: Sendable {
-        public var onLog: (@Sendable (LogEvent) -> Void)?
-        public var onMetric: (@Sendable (MetricEvent) -> Void)?
-        public var onTrace: (@Sendable (TraceEvent) -> Void)?
-
-        public init(
-            onLog: (@Sendable (LogEvent) -> Void)? = nil,
-            onMetric: (@Sendable (MetricEvent) -> Void)? = nil,
-            onTrace: (@Sendable (TraceEvent) -> Void)? = nil
-        ) {
-            self.onLog = onLog
-            self.onMetric = onMetric
-            self.onTrace = onTrace
-        }
-
-        /// No-op observability configuration.
-        public static let disabled = Self()
-    }
-
-    /// Structured log record emitted by session runtime internals.
-    struct LogEvent: Sendable, Hashable {
-        public enum Level: String, Sendable, Hashable, Codable {
-            case debug
-            case info
-            case warning
-            case error
-        }
-
-        public let level: Level
-        public let code: String
-        public let message: String
-        public let metadata: [String: String]
-        public let timestamp: Date
-
-        public init(
-            level: Level,
-            code: String,
-            message: String,
-            metadata: [String: String] = [:],
-            timestamp: Date = Date()
-        ) {
-            self.level = level
-            self.code = code
-            self.message = message
-            self.metadata = metadata
-            self.timestamp = timestamp
-        }
-    }
-
-    /// Structured metric record emitted by session runtime internals.
-    struct MetricEvent: Sendable, Hashable {
-        public let name: String
-        public let value: Double
-        public let unit: String
-        public let dimensions: [String: String]
-        public let timestamp: Date
-
-        public init(
-            name: String,
-            value: Double,
-            unit: String,
-            dimensions: [String: String] = [:],
-            timestamp: Date = Date()
-        ) {
-            self.name = name
-            self.value = value
-            self.unit = unit
-            self.dimensions = dimensions
-            self.timestamp = timestamp
-        }
-    }
-
-    /// Structured trace record emitted by session runtime internals.
-    struct TraceEvent: Sendable, Hashable {
-        public enum Phase: String, Sendable, Hashable, Codable {
-            case begin
-            case end
-            case instant
-        }
-
-        public let name: String
-        public let phase: Phase
-        public let traceID: UUID
-        public let attributes: [String: String]
-        public let timestamp: Date
-
-        public init(
-            name: String,
-            phase: Phase,
-            traceID: UUID,
-            attributes: [String: String] = [:],
-            timestamp: Date = Date()
-        ) {
-            self.name = name
-            self.phase = phase
-            self.traceID = traceID
-            self.attributes = attributes
-            self.timestamp = timestamp
-        }
-    }
-
     /// Session connection behavior tuning.
     struct Configuration: Sendable, Hashable, Codable {
         public var connectTimeout: TimeInterval
@@ -245,6 +143,8 @@ public extension CastSession {
         public var reconnectRetryDelay: TimeInterval
         public var reconnectPolicy: ReconnectPolicy
         public var stateRestorationPolicy: StateRestorationPolicy
+        /// Runtime diagnostics level for session internals.
+        public var logLevel: ChromecastKitLogLevel
 
         public init(
             connectTimeout: TimeInterval = 10,
@@ -253,7 +153,8 @@ public extension CastSession {
             autoReconnect: Bool = true,
             reconnectRetryDelay: TimeInterval = 1,
             reconnectPolicy: ReconnectPolicy? = nil,
-            stateRestorationPolicy: StateRestorationPolicy = .receiverAndMedia
+            stateRestorationPolicy: StateRestorationPolicy = .receiverAndMedia,
+            logLevel: ChromecastKitLogLevel = .error
         ) {
             self.connectTimeout = connectTimeout
             self.commandTimeout = commandTimeout
@@ -263,6 +164,7 @@ public extension CastSession {
             self.reconnectRetryDelay = resolvedReconnectPolicy.initialDelay
             self.reconnectPolicy = resolvedReconnectPolicy
             self.stateRestorationPolicy = stateRestorationPolicy
+            self.logLevel = logLevel
         }
     }
 

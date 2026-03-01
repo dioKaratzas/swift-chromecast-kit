@@ -30,6 +30,15 @@ struct SessionDashboardView: View {
                         "\(model.sessionConfiguration.reconnectRetryDelay, format: .number.precision(.fractionLength(0 ... 2)))s"
                     )
                 }
+                LabeledContent("Log Level") {
+                    Picker("Session Log Level", selection: $model.sessionConfiguration.logLevel) {
+                        ForEach(logLevels, id: \.rawValue) { level in
+                            Text(logLevelTitle(level)).tag(level)
+                        }
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.menu)
+                }
                 HStack {
                     Button("Refresh Snapshot") {
                         model.refreshSessionSnapshotButtonTapped()
@@ -236,6 +245,21 @@ struct SessionDashboardView: View {
         case let .tvShow(value): value.title ?? value.seriesTitle ?? "TV Show"
         case let .musicTrack(value): value.title ?? value.artist ?? "Music"
         case let .photo(value): value.title ?? value.location ?? "Photo"
+        }
+    }
+
+    private var logLevels: [ChromecastKitLogLevel] {
+        [.none, .error, .warning, .info, .debug, .trace]
+    }
+
+    private func logLevelTitle(_ level: ChromecastKitLogLevel) -> String {
+        switch level {
+        case .none: "None"
+        case .error: "Error"
+        case .warning: "Warning"
+        case .info: "Info"
+        case .debug: "Debug"
+        case .trace: "Trace"
         }
     }
 }

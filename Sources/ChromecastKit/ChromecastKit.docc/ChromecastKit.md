@@ -100,5 +100,5 @@ If you are new to the package, use this order:
 - ``CastSession/Configuration``
 - ``CastSession/ReconnectPolicy``
 - ``CastSession/StateRestorationPolicy``
-- ``CastSession/Observability``
+- ``ChromecastKitLogLevel``
 - ``CastError``

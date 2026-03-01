@@ -18,15 +18,21 @@ actor NWTLSCastV2Transport: CastConnectionTransport, CastCommandTransport, CastI
     private let device: CastDeviceDescriptor
     private let callbackQueue = DispatchQueue(label: "ChromecastKit.Transport.CastV2")
     private let receiveChunkSize: Int
+    private let logger: ChromecastKitDiagnosticsLogger
 
     private var connection: NWConnection?
     private var inboundContinuations = [UUID: AsyncStream<CastInboundMessage>.Continuation]()
     private var inboundEventContinuations = [UUID: AsyncStream<CastInboundTransportEvent>.Continuation]()
     private var readLoopTask: Task<Void, Never>?
 
-    init(device: CastDeviceDescriptor, receiveChunkSize: Int = 64 * 1024) {
+    init(
+        device: CastDeviceDescriptor,
+        receiveChunkSize: Int = 64 * 1024,
+        logLevel: ChromecastKitLogLevel = .error
+    ) {
         self.device = device
         self.receiveChunkSize = max(1024, receiveChunkSize)
+        logger = .init(level: logLevel, category: .transport)
     }
 
     func inboundMessages() async -> AsyncStream<CastInboundMessage> {
@@ -51,8 +57,10 @@ actor NWTLSCastV2Transport: CastConnectionTransport, CastCommandTransport, CastI
 
     func connect(timeout: TimeInterval) async throws {
         if connection != nil {
+            logger.trace("connect ignored: transport already connected")
             return
         }
+        logger.debug("connecting transport to \(device.host):\(device.port) timeout=\(timeout)")
 
         let endpointHost = NWEndpoint.Host(device.host)
         guard let endpointPort = NWEndpoint.Port(rawValue: UInt16(device.port)) else {
@@ -77,8 +85,10 @@ actor NWTLSCastV2Transport: CastConnectionTransport, CastCommandTransport, CastI
             try await Self.startAndWaitUntilReady(connection, queue: callbackQueue, timeout: timeout)
             self.connection = connection
             startReadLoop(connection)
+            logger.info("transport connected to \(device.host):\(device.port)")
         } catch {
             connection.cancel()
+            logger.error("transport connect failed: \(error)")
             throw error is CastError ? error : CastError.connectionFailed(String(describing: error))
         }
     }
@@ -90,12 +100,16 @@ actor NWTLSCastV2Transport: CastConnectionTransport, CastCommandTransport, CastI
         connection?.cancel()
         connection = nil
         finishInboundStreams()
+        logger.info("transport disconnected")
     }
 
     func send(_ command: CastEncodedCommand) async throws {
         guard let connection else {
             throw CastError.disconnected
         }
+        logger.trace(
+            "sending frame requestId=\(command.requestID.rawValue) namespace=\(command.route.namespace.rawValue) destination=\(command.route.destinationID)"
+        )
 
         let frame = try CastV2FrameCodec.encodeFrame(command: command)
         try await Self.send(frame, on: connection)
@@ -131,12 +145,14 @@ actor NWTLSCastV2Transport: CastConnectionTransport, CastCommandTransport, CastI
                             }
                         } catch {
                             // Ignore malformed inbound messages for now; connection remains alive.
+                            logger.debug("dropped malformed inbound Cast message: \(error)")
                             continue
                         }
                     }
                 }
 
                 if chunk.isComplete {
+                    logger.info("transport stream closed by remote peer")
                     emitInboundEvent(.closed)
                     finishInboundStreams()
                     break
@@ -144,8 +160,10 @@ actor NWTLSCastV2Transport: CastConnectionTransport, CastCommandTransport, CastI
             }
         } catch is CancellationError {
             // Expected during explicit disconnect or reconnect.
+            logger.trace("transport read loop cancelled")
         } catch {
             let castError = (error as? CastError) ?? .connectionFailed(String(describing: error))
+            logger.error("transport read loop failed: \(castError)")
             emitInboundEvent(.failure(castError))
             finishInboundStreams()
         }

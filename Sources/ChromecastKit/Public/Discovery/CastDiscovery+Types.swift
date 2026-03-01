@@ -14,15 +14,19 @@ public extension CastDiscovery {
         public var includeGroups: Bool
         public var browseTimeout: TimeInterval?
         public var enableSSDPFallback: Bool
+        /// Runtime diagnostics level for discovery internals.
+        public var logLevel: ChromecastKitLogLevel
 
         public init(
             includeGroups: Bool = true,
             browseTimeout: TimeInterval? = nil,
-            enableSSDPFallback: Bool = false
+            enableSSDPFallback: Bool = false,
+            logLevel: ChromecastKitLogLevel = .error
         ) {
             self.includeGroups = includeGroups
             self.browseTimeout = browseTimeout
             self.enableSSDPFallback = enableSSDPFallback
+            self.logLevel = logLevel
         }
     }
 

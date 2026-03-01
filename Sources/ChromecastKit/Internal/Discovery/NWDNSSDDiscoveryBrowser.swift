@@ -17,6 +17,7 @@ actor NWDNSSDDiscoveryBrowser: CastDiscoveryBrowser {
 
     private let callbackQueue = DispatchQueue(label: "ChromecastKit.Discovery.NWBrowser")
 
+    private var logger = ChromecastKitDiagnosticsLogger(level: .error, category: .discovery)
     private var browser: NWBrowser?
     private var configuration = CastDiscovery.Configuration()
     private var eventContinuations = [UUID: AsyncStream<CastDiscoveryBrowserEvent>.Continuation]()
@@ -39,10 +40,13 @@ actor NWDNSSDDiscoveryBrowser: CastDiscoveryBrowser {
 
     func start(configuration: CastDiscovery.Configuration) async throws {
         guard browser == nil else {
+            logger.trace("mDNS browser start ignored: already running")
             return
         }
 
         self.configuration = configuration
+        logger.setLevel(configuration.logLevel)
+        logger.debug("starting mDNS browser")
 
         let parameters = NWParameters.tcp
         parameters.includePeerToPeer = false
@@ -73,6 +77,7 @@ actor NWDNSSDDiscoveryBrowser: CastDiscoveryBrowser {
         }
         resolutionTasks.removeAll()
         discoveredDeviceIDsByService.removeAll()
+        logger.debug("stopped mDNS browser")
     }
 
     // MARK: Browser Callbacks
@@ -80,12 +85,16 @@ actor NWDNSSDDiscoveryBrowser: CastDiscoveryBrowser {
     private func handleBrowserState(_ state: NWBrowser.State) {
         switch state {
         case .waiting:
+            logger.trace("mDNS browser waiting for network")
             break
         case let .failed(error):
+            logger.error("mDNS browser failed: \(error)")
             emit(.error(.discoveryFailed(String(describing: error))))
         case .cancelled:
+            logger.trace("mDNS browser cancelled")
             break
         case .setup, .ready:
+            logger.trace("mDNS browser state=\(String(describing: state))")
             break
         @unknown default:
             break
@@ -142,6 +151,7 @@ actor NWDNSSDDiscoveryBrowser: CastDiscoveryBrowser {
                 // Replaced or removed service while resolving.
             } catch {
                 // Individual service resolution failures should not fail browsing entirely.
+                self.logger.debug("mDNS service resolution failed for '\(service.name)': \(error)")
                 self.clearResolutionTask(for: service)
             }
         }
@@ -165,6 +175,7 @@ actor NWDNSSDDiscoveryBrowser: CastDiscoveryBrowser {
         clearResolutionTask(for: service)
         discoveredDeviceIDsByService[service] = descriptor.id
         emit(.deviceUpserted(descriptor))
+        logger.trace("resolved mDNS service '\(service.name)' as \(descriptor.friendlyName)")
     }
 
     private func removeKnownDeviceIfPresent(for service: CastBonjourDiscoveryParser.ServiceIdentity) {
@@ -173,6 +184,7 @@ actor NWDNSSDDiscoveryBrowser: CastDiscoveryBrowser {
             return
         }
         emit(.deviceRemoved(deviceID))
+        logger.trace("removed mDNS device for service '\(service.name)'")
     }
 
     private func clearResolutionTask(for service: CastBonjourDiscoveryParser.ServiceIdentity) {

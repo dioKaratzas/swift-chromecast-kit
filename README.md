@@ -22,7 +22,7 @@ ChromecastKit is a production-focused Swift sender SDK for Google Cast (Chromeca
 |---|---|
 | API design | Strongly typed `Sendable` models and Swift-native APIs |
 | Runtime reliability | Reconnect policy controls (backoff, jitter, retry caps, network-path-aware behavior) |
-| Observability | Runtime log/metric/trace hooks for reconnect lifecycle events |
+| Logging | Built-in `OSLog` diagnostics with configurable package log levels |
 | Extensibility | Custom namespaces, binary payload support, app-controller protocols |
 | Example coverage | `Player` for focused flows and `Showcase` for broad SDK surface exploration |
 
@@ -37,7 +37,7 @@ ChromecastKit is a sender/control SDK. It does not host media or subtitles. App-
 | Category | Jump to section |
 |---|---|
 | Getting started | [Installation](#installation), [Quick Start](#quick-start) |
-| Runtime and reliability | [Recovery Policy (Reconnect)](#recovery-policy-reconnect), [Observability Hooks](#observability-hooks) |
+| Runtime and reliability | [Recovery Policy (Reconnect)](#recovery-policy-reconnect), [Package Logging](#package-logging) |
 | Playback and tracks | [Subtitles (WebVTT)](#subtitles-webvtt), [Queues](#queues), [Receiver Controls (Work With Any App)](#receiver-controls-work-with-any-app) |
 | Discovery and network behavior | [Discovery Strategies](#discovery-strategies) |
 | Advanced integrations | [Custom Namespaces (Advanced)](#custom-namespaces-advanced), [YouTube (MDX Quick Play / Queue Actions)](#youtube-mdx-quick-play--queue-actions) |
@@ -50,7 +50,7 @@ ChromecastKit is a sender/control SDK. It does not host media or subtitles. App-
 - Swift Concurrency-first runtime (`actor` isolation, `AsyncStream`, structured async workflows)
 - Typed APIs instead of dictionary-heavy callsites (`Sendable` models, strong IDs, concrete controllers)
 - Production reconnect controls (exponential backoff, jitter, retry limits, network-path-aware recovery)
-- Built-in runtime observability (structured logs, metrics, traces for reconnect lifecycle events)
+- Built-in `OSLog` diagnostics with configurable verbosity (`.error` default, `.trace` for deep debugging)
 - Advanced extension points for app-specific protocols (custom namespaces and controller protocols)
 - Two example apps to accelerate adoption: `Player` for focused flows and `Showcase` for full-surface integration patterns
 
@@ -163,28 +163,38 @@ Use `stateRestorationPolicy` to control reconnect bootstrap behavior:
 - `.receiverOnly` restores receiver state only
 - `.receiverAndMedia` restores receiver + media/app transport state
 
-## Observability Hooks
+## Package Logging
 
-Attach structured runtime diagnostics:
+Configure runtime diagnostics with `ChromecastKitLogLevel`:
 
 ```swift
+let discovery = CastDiscovery(
+    configuration: .init(
+        includeGroups: true,
+        enableSSDPFallback: true,
+        logLevel: .warning
+    )
+)
+
 let session = CastSession(
     device: device,
-    observability: .init(
-        onLog: { event in
-            print("[\(event.level.rawValue)] \(event.code): \(event.message)")
-        },
-        onMetric: { event in
-            print("metric \(event.name)=\(event.value) \(event.unit)")
-        },
-        onTrace: { event in
-            print("trace \(event.name) \(event.phase.rawValue) \(event.traceID)")
-        }
+    configuration: .init(
+        autoReconnect: true,
+        logLevel: .debug
     )
 )
 ```
 
-Runtime observability currently focuses on recovery/reconnect lifecycle paths.
+Default level is `.error` for low-noise logs.
+
+Inspect logs in Console.app or from Terminal:
+
+```bash
+log stream --level debug --predicate 'subsystem == "com.swift-chromecast-kit"'
+log stream --level debug --predicate 'subsystem == "com.swift-chromecast-kit" && category == "session"'
+```
+
+Categories include `discovery`, `session`, `transport`, and `command`.
 
 ## Subtitles (WebVTT)
 

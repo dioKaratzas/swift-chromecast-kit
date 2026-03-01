@@ -24,6 +24,7 @@ actor CastConnection {
     private var stateValue = State.disconnected
     private var eventContinuations = [UUID: AsyncStream<Event>.Continuation]()
     private let transport: any CastConnectionTransport
+    private let logger: ChromecastKitDiagnosticsLogger
 
     // MARK: Lifecycle
 
@@ -33,6 +34,7 @@ actor CastConnection {
     ) {
         self.configuration = configuration
         self.transport = transport
+        logger = .init(level: configuration.logLevel, category: .session)
     }
 
     /// Returns the current connection state snapshot.
@@ -69,10 +71,12 @@ actor CastConnection {
             try await transport.connect(timeout: configuration.connectTimeout)
             stateValue = .connected
             emit(.connected)
+            logger.info("connection established")
         } catch {
             let castError = mapConnectionError(error)
             stateValue = .failed(castError)
             emit(.error(castError))
+            logger.error("connection failed: \(castError)")
             throw castError
         }
     }
@@ -82,6 +86,7 @@ actor CastConnection {
         await transport.disconnect()
         stateValue = .disconnected
         emit(.disconnected(reason: reason))
+        logger.info("connection closed reason=\(reason.rawValue)")
     }
 
     /// Reconnects the underlying transport and emits a reconnection event on success.
@@ -93,10 +98,12 @@ actor CastConnection {
             try await transport.connect(timeout: configuration.connectTimeout)
             stateValue = .connected
             emit(.reconnected)
+            logger.info("connection re-established")
         } catch {
             let castError = mapConnectionError(error)
             stateValue = .failed(castError)
             emit(.error(castError))
+            logger.error("reconnect failed: \(castError)")
             throw castError
         }
     }
@@ -108,6 +115,7 @@ actor CastConnection {
     func reportRuntimeError(_ error: CastError) {
         stateValue = .failed(error)
         emit(.error(error))
+        logger.error("runtime connection failure: \(error)")
     }
 
     // MARK: Helpers

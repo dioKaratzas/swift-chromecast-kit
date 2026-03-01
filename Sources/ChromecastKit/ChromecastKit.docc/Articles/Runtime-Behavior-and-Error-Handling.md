@@ -14,7 +14,7 @@
 Use this page when you are:
 
 - tuning reconnect behavior for production conditions
-- integrating runtime logs/metrics/traces into your app telemetry
+- configuring runtime diagnostics log levels
 - validating failure semantics (timeouts, disconnects, non-success replies)
 
 ## Session Configuration
@@ -37,7 +37,8 @@ let session = CastSession(
             maxAttempts: nil,
             waitsForReachableNetworkPath: true
         ),
-        stateRestorationPolicy: .receiverAndMedia
+        stateRestorationPolicy: .receiverAndMedia,
+        logLevel: .error
     )
 )
 ```
@@ -85,35 +86,41 @@ When using ``CastSession/sendAndAwaitReply(namespace:target:payload:timeout:)``,
 
 This provides `async/await` ergonomics over an event-driven Cast protocol.
 
-## Observability Hooks
+## Package Logging
 
-Attach runtime diagnostics hooks when creating a session:
+`ChromecastKit` emits runtime diagnostics through `OSLog` categories.
+Configure verbosity with ``ChromecastKitLogLevel`` in session/discovery configuration:
 
 ```swift
+let discovery = CastDiscovery(
+    configuration: .init(
+        includeGroups: true,
+        enableSSDPFallback: true,
+        logLevel: .warning
+    )
+)
+
 let session = CastSession(
     device: device,
-    configuration: .init(),
-    observability: .init(
-        onLog: { log in
-            print("[\(log.level.rawValue)] \(log.code): \(log.message)")
-        },
-        onMetric: { metric in
-            print("metric \(metric.name)=\(metric.value) \(metric.unit)")
-        },
-        onTrace: { trace in
-            print("trace \(trace.name) \(trace.phase.rawValue) \(trace.traceID)")
-        }
+    configuration: .init(
+        logLevel: .debug
     )
 )
 ```
 
-The runtime emits structured events for reconnect lifecycle milestones:
+Use categories in Console.app or `log` CLI filters:
 
-- recovery start/finish
-- reconnect attempts, delays, success, failures
-- network-wait timeout when path gating is enabled
+```bash
+log stream --level debug --predicate 'subsystem == "com.swift-chromecast-kit"'
+log stream --level debug --predicate 'subsystem == "com.swift-chromecast-kit" && category == "session"'
+```
 
-Observability hooks are intentionally scoped to session runtime/lifecycle paths.
+Built-in categories include:
+
+- `discovery`
+- `session`
+- `transport`
+- `command`
 
 ## Error Model
 

@@ -16,6 +16,7 @@ actor CompositeCastDiscoveryBrowser: CastDiscoveryBrowser {
     private let mdnsBrowser: any CastDiscoveryBrowser
     private let ssdpBrowser: any CastDiscoveryBrowser
 
+    private var logger = ChromecastKitDiagnosticsLogger(level: .error, category: .discovery)
     private var eventContinuations = [UUID: AsyncStream<CastDiscoveryBrowserEvent>.Continuation]()
     private var backendTasks = [Task<Void, Never>]()
     private var isRunning = false
@@ -44,15 +45,19 @@ actor CompositeCastDiscoveryBrowser: CastDiscoveryBrowser {
 
     func start(configuration: CastDiscovery.Configuration) async throws {
         guard isRunning == false else {
+            logger.trace("composite browser start ignored: already running")
             return
         }
+        logger.setLevel(configuration.logLevel)
         isRunning = true
+        logger.debug("starting composite discovery browser")
 
         startForwardingTask(for: mdnsBrowser)
 
         do {
             try await mdnsBrowser.start(configuration: configuration)
         } catch {
+            logger.error("mDNS backend failed to start: \(error)")
             await stop()
             throw error
         }
@@ -63,6 +68,7 @@ actor CompositeCastDiscoveryBrowser: CastDiscoveryBrowser {
                 try await ssdpBrowser.start(configuration: configuration)
             } catch {
                 // SSDP is best-effort fallback. Emit an error event but keep mDNS running.
+                logger.warning("SSDP fallback failed to start: \(error)")
                 emit(error as? CastError ?? .discoveryFailed(String(describing: error)))
             }
         }
@@ -73,6 +79,7 @@ actor CompositeCastDiscoveryBrowser: CastDiscoveryBrowser {
             return
         }
         isRunning = false
+        logger.debug("stopping composite discovery browser")
 
         for task in backendTasks {
             task.cancel()
@@ -81,6 +88,7 @@ actor CompositeCastDiscoveryBrowser: CastDiscoveryBrowser {
 
         await mdnsBrowser.stop()
         await ssdpBrowser.stop()
+        logger.info("composite discovery browser stopped")
     }
 
     // MARK: Private Helpers
@@ -102,6 +110,7 @@ actor CompositeCastDiscoveryBrowser: CastDiscoveryBrowser {
     }
 
     private func emit(_ error: CastError) {
+        logger.warning("discovery backend emitted error: \(error)")
         forward(.error(error))
     }
 

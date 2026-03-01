@@ -10,6 +10,18 @@ import Foundation
 
 @Suite("Cast Discovery Runtime")
 struct CastDiscoveryTests {
+    @Test("configuration defaults runtime logging to error")
+    func configurationDefaultLogLevel() {
+        let configuration = CastDiscovery.Configuration()
+        #expect(configuration.logLevel == .error)
+    }
+
+    @Test("configuration stores explicit runtime logging level")
+    func configurationCustomLogLevel() {
+        let configuration = CastDiscovery.Configuration(logLevel: .trace)
+        #expect(configuration.logLevel == .trace)
+    }
+
     @Test("start transitions to running and emits started")
     func startSuccess() async throws {
         let browser = RecordingDiscoveryBrowser()

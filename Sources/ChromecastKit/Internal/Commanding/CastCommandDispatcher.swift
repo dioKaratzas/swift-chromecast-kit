@@ -48,25 +48,32 @@ actor CastCommandDispatcher {
     private var sourceID: CastEndpointID
     private var currentApplicationTransportID: CastTransportID?
     private var pendingReplies = [CastRequestID: PendingReply]()
+    private let logger: ChromecastKitDiagnosticsLogger
 
     init(
         transport: any CastCommandTransport,
         sourceID: CastEndpointID = "sender-0",
-        defaultReplyTimeout: TimeInterval = 10
+        defaultReplyTimeout: TimeInterval = 10,
+        logLevel: ChromecastKitLogLevel = .error
     ) {
         self.transport = transport
         self.sourceID = sourceID
         self.defaultReplyTimeout = defaultReplyTimeout
+        logger = .init(level: logLevel, category: .command)
     }
 
     // MARK: Configuration
 
     func setSourceID(_ sourceID: CastEndpointID) {
         self.sourceID = sourceID
+        logger.debug("updated source endpoint id to '\(sourceID)'")
     }
 
     func setCurrentApplicationTransportID(_ transportID: CastTransportID?) {
         currentApplicationTransportID = transportID
+        logger.trace(
+            "updated current application transport id to '\(transportID?.rawValue ?? "nil")'"
+        )
     }
 
     // MARK: Command Sending
@@ -78,6 +85,7 @@ actor CastCommandDispatcher {
         payload: Payload
     ) async throws -> CastRequestID {
         let command = try makeEncodedCommand(namespace: namespace, target: target, payload: payload)
+        logger.trace("sending tracked command requestId=\(command.requestID.rawValue) namespace=\(namespace.rawValue)")
         try await transport.send(command)
         return command.requestID
     }
@@ -91,6 +99,7 @@ actor CastCommandDispatcher {
         let command = try makeEncodedBinaryCommand(
             namespace: namespace, target: target, payload: payload
         )
+        logger.trace("sending tracked binary command requestId=\(command.requestID.rawValue) namespace=\(namespace.rawValue)")
         try await transport.send(command)
         return command.requestID
     }
@@ -109,6 +118,7 @@ actor CastCommandDispatcher {
             payload: payload,
             includeRequestID: false
         )
+        logger.trace("sending untracked command namespace=\(namespace.rawValue)")
         try await transport.send(command)
     }
 
@@ -123,6 +133,7 @@ actor CastCommandDispatcher {
             payload: payload,
             includeRequestID: false
         )
+        logger.trace("sending untracked binary command namespace=\(namespace.rawValue)")
         try await transport.send(command)
     }
 
@@ -151,6 +162,9 @@ actor CastCommandDispatcher {
                         sendTask: nil
                     ),
                     timeout: replyTimeout
+                )
+                logger.debug(
+                    "awaiting reply requestId=\(command.requestID.rawValue) namespace=\(namespace.rawValue) timeout=\(replyTimeout)"
                 )
 
                 let sendTask = Task { [requestID = command.requestID] in
@@ -184,6 +198,9 @@ actor CastCommandDispatcher {
               let pendingReply = pendingReplies.removeValue(forKey: requestID) else {
             return false
         }
+        logger.trace(
+            "matched pending reply requestId=\(requestID.rawValue) namespace=\(message.route.namespace.rawValue)"
+        )
 
         pendingReply.timeoutTask?.cancel()
         pendingReply.sendTask?.cancel()
@@ -225,6 +242,7 @@ actor CastCommandDispatcher {
         guard let pendingReply = pendingReplies.removeValue(forKey: requestID) else {
             return
         }
+        logger.warning("request timed out requestId=\(requestID.rawValue)")
         pendingReply.timeoutTask?.cancel()
         pendingReply.sendTask?.cancel()
         pendingReply.continuation.resume(throwing: CastError.timeout(operation: pendingReply.operation))
@@ -234,6 +252,7 @@ actor CastCommandDispatcher {
         guard let pendingReply = pendingReplies.removeValue(forKey: requestID) else {
             return
         }
+        logger.debug("request cancelled requestId=\(requestID.rawValue)")
         pendingReply.timeoutTask?.cancel()
         pendingReply.sendTask?.cancel()
         pendingReply.continuation.resume(throwing: CancellationError())
@@ -243,6 +262,7 @@ actor CastCommandDispatcher {
         guard let pendingReply = pendingReplies.removeValue(forKey: requestID) else {
             return
         }
+        logger.warning("request failed requestId=\(requestID.rawValue) error=\(error)")
         pendingReply.timeoutTask?.cancel()
         pendingReply.sendTask?.cancel()
         pendingReply.continuation.resume(throwing: error)
@@ -252,6 +272,7 @@ actor CastCommandDispatcher {
         guard pendingReplies.isEmpty == false else {
             return
         }
+        logger.warning("failing \(pendingReplies.count) pending request(s) due to runtime failure: \(error)")
 
         let pending = pendingReplies.values
         pendingReplies.removeAll(keepingCapacity: false)

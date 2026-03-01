@@ -16,7 +16,7 @@ final class PlayerModel {
         static let subtitleTrackID: CastMediaTrackID = 1
     }
 
-    private let discovery: CastDiscovery
+    private var discovery: CastDiscovery
     private let localFileServer = CastLocalFileServer()
 
     private var discoveryEventsTask: Task<Void, Never>?
@@ -62,17 +62,28 @@ final class PlayerModel {
 
     var latestUserError: String?
     private(set) var logs = [LogEntry]()
+    var discoveryLogLevel: ChromecastKitLogLevel = .error {
+        didSet {
+            if discoveryLogLevel != oldValue {
+                Task { @MainActor [weak self] in
+                    await self?.applyDiscoveryLogLevelChange()
+                }
+            }
+        }
+    }
+    var sessionLogLevel: ChromecastKitLogLevel = .error
 
     init(
-        discovery: CastDiscovery = CastDiscovery(
-            configuration: .init(
-                includeGroups: true,
-                browseTimeout: nil,
-                enableSSDPFallback: true
-            )
-        )
+        discoveryConfiguration: CastDiscovery.Configuration = .init(
+            includeGroups: true,
+            browseTimeout: nil,
+            enableSSDPFallback: true,
+            logLevel: .error
+        ),
+        discovery: CastDiscovery? = nil
     ) {
-        self.discovery = discovery
+        self.discoveryLogLevel = discoveryConfiguration.logLevel
+        self.discovery = discovery ?? CastDiscovery(configuration: discoveryConfiguration)
     }
 
     var selectedDevice: CastDeviceDescriptor? {
@@ -611,6 +622,27 @@ final class PlayerModel {
         }
     }
 
+    private func applyDiscoveryLogLevelChange() async {
+        let currentState = await discovery.state()
+        guard currentState != .running, currentState != .starting else {
+            appendLog("Stop discovery before changing discovery log level.")
+            return
+        }
+
+        discoveryEventsTask?.cancel()
+        discoveryEventsTask = nil
+        discovery = CastDiscovery(
+            configuration: .init(
+                includeGroups: true,
+                browseTimeout: nil,
+                enableSSDPFallback: true,
+                logLevel: discoveryLogLevel
+            )
+        )
+        await refreshDiscoverySnapshot()
+        startDiscoveryEventsIfNeeded()
+    }
+
     private func stopDiscovery() async {
         await discovery.stop()
         await refreshDiscoverySnapshot()
@@ -660,7 +692,10 @@ final class PlayerModel {
         }
 
         if session == nil {
-            let newSession = CastSession(device: selectedDevice)
+            let newSession = CastSession(
+                device: selectedDevice,
+                configuration: .init(logLevel: sessionLogLevel)
+            )
             session = newSession
             attachSessionStreams(to: newSession)
         }

@@ -5,6 +5,7 @@
 //
 
 import SwiftUI
+import ChromecastKit
 #if os(iOS)
     import UIKit
 #elseif os(macOS)
@@ -55,8 +56,41 @@ struct PlayerSettingsView: View {
                 }
                 .disabled(model.canApplySubtitleStyleToChromecast == false)
             }
+
+            Section("Diagnostics") {
+                Picker("Discovery Log Level", selection: $model.discoveryLogLevel) {
+                    ForEach(logLevels, id: \.rawValue) { level in
+                        Text(logLevelTitle(level)).tag(level)
+                    }
+                }
+
+                Picker("Session Log Level", selection: $model.sessionLogLevel) {
+                    ForEach(logLevels, id: \.rawValue) { level in
+                        Text(logLevelTitle(level)).tag(level)
+                    }
+                }
+
+                Text("Stop discovery before changing discovery log level.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
         }
         .navigationTitle("Player Settings")
+    }
+
+    private var logLevels: [ChromecastKitLogLevel] {
+        [.none, .error, .warning, .info, .debug, .trace]
+    }
+
+    private func logLevelTitle(_ level: ChromecastKitLogLevel) -> String {
+        switch level {
+        case .none: "None"
+        case .error: "Error"
+        case .warning: "Warning"
+        case .info: "Info"
+        case .debug: "Debug"
+        case .trace: "Trace"
+        }
     }
 
     private var subtitleForegroundBinding: Binding<Color> {

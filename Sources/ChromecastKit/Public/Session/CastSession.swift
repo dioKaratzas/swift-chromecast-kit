@@ -31,19 +31,15 @@ public actor CastSession {
     // MARK: Initialization
 
     /// Creates a Cast session for a discovered device using the built-in Cast v2 TLS transport.
-    ///
-    /// Use `observability` to receive structured runtime diagnostics (logs/metrics/traces).
     public init(
         device: CastDeviceDescriptor,
-        configuration: Configuration = .init(),
-        observability: Observability = .disabled
+        configuration: Configuration = .init()
     ) {
-        let transport = NWTLSCastV2Transport(device: device)
+        let transport = NWTLSCastV2Transport(device: device, logLevel: configuration.logLevel)
         let runtime = CastSessionRuntime(
             device: device,
             transport: transport,
-            configuration: configuration,
-            observability: observability
+            configuration: configuration
         )
 
         self.device = device

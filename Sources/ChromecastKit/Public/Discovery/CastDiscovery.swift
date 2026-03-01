@@ -19,6 +19,7 @@ public actor CastDiscovery {
     // MARK: Private State
 
     private let browser: any CastDiscoveryBrowser
+    private let logger: ChromecastKitDiagnosticsLogger
     private var stateValue = CastDiscovery.State.stopped
     private var devicesByID = [CastDeviceID: CastDeviceDescriptor]()
     private var eventContinuations = [UUID: AsyncStream<CastDiscovery.Event>.Continuation]()
@@ -144,10 +145,12 @@ public actor CastDiscovery {
     public func start() async throws {
         switch stateValue {
         case .running, .starting:
+            logger.trace("start ignored: discovery already active")
             return
         case .stopped, .failed:
             break
         }
+        logger.debug("starting discovery (ssdpFallback=\(configuration.enableSSDPFallback))")
 
         stateValue = .starting
         startBrowserEventTaskIfNeeded()
@@ -156,6 +159,7 @@ public actor CastDiscovery {
             try await browser.start(configuration: configuration)
             stateValue = .running
             emit(.started)
+            logger.info("discovery started")
         } catch {
             browserEventsTask?.cancel()
             browserEventsTask = nil
@@ -165,6 +169,7 @@ public actor CastDiscovery {
             let castError = mapDiscoveryError(error)
             stateValue = .failed(castError)
             emit(.error(castError))
+            logger.error("discovery start failed: \(castError)")
             throw castError
         }
 
@@ -190,6 +195,7 @@ public actor CastDiscovery {
         activeBrowseRunID = nil
         stateValue = .stopped
         emit(.stopped)
+        logger.info("discovery stopped")
     }
 
     /// Restarts discovery browsing and preserves the current snapshot unless browsers emit removals.
@@ -275,6 +281,7 @@ public actor CastDiscovery {
     ) {
         self.configuration = configuration
         self.browser = browser
+        logger = .init(level: configuration.logLevel, category: .discovery)
     }
 
     // MARK: Internal Browser Integration
@@ -286,6 +293,7 @@ public actor CastDiscovery {
         if devicesByID[device.id] != nil {
             devicesByID[device.id] = device
             emit(.deviceUpserted(device: device, isNew: false))
+            logger.debug("updated discovered device '\(device.friendlyName)'")
             return
         }
 
@@ -296,11 +304,13 @@ public actor CastDiscovery {
             )
             devicesByID[existingID] = merged
             emit(.deviceUpserted(device: merged, isNew: false))
+            logger.debug("updated discovered device '\(merged.friendlyName)' via identity merge")
             return
         }
 
         let isNew = devicesByID.updateValue(device, forKey: device.id) == nil
         emit(.deviceUpserted(device: device, isNew: isNew))
+        logger.debug("\(isNew ? "discovered" : "updated") device '\(device.friendlyName)'")
     }
 
     /// Removes a discovered device by identifier.
@@ -311,6 +321,7 @@ public actor CastDiscovery {
             return
         }
         emit(.deviceRemoved(id: id))
+        logger.debug("removed discovered device id=\(id.rawValue)")
     }
 
     // MARK: Private Helpers
@@ -342,6 +353,7 @@ public actor CastDiscovery {
         case let .deviceRemoved(id):
             removeDiscoveredDevice(id: id)
         case let .error(error):
+            logger.warning("browser error event: \(error)")
             await transitionToFailed(error)
         }
     }
@@ -434,6 +446,7 @@ public actor CastDiscovery {
         guard stateValue == .running else {
             return
         }
+        logger.info("browse timeout reached; stopping discovery")
         await stop()
     }
 
@@ -446,6 +459,7 @@ public actor CastDiscovery {
         activeBrowseRunID = nil
         stateValue = .failed(error)
         emit(.error(error))
+        logger.error("discovery transitioned to failed state: \(error)")
     }
 
     private func waitForDeviceFromEvents(

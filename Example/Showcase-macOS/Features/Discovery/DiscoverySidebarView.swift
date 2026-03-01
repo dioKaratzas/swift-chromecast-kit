@@ -21,6 +21,15 @@ struct DiscoverySidebarView: View {
                     Text("mDNS + SSDP")
                         .foregroundStyle(.secondary)
                 }
+                LabeledContent("Log Level") {
+                    Picker("Discovery Log Level", selection: $model.discoveryConfiguration.logLevel) {
+                        ForEach(logLevels, id: \.rawValue) { level in
+                            Text(logLevelTitle(level)).tag(level)
+                        }
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.menu)
+                }
                 LabeledContent("Devices") {
                     Text(model.devices.count, format: .number)
                         .monospacedDigit()
@@ -32,6 +41,9 @@ struct DiscoverySidebarView: View {
                             .lineLimit(2)
                     }
                 }
+                Text("Stop discovery before changing log level.")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
             } header: {
                 Text("Discovery")
             }
@@ -153,6 +165,21 @@ struct DiscoverySidebarView: View {
                     description: Text("Start discovery and allow local network access to find Chromecast devices.")
                 )
             }
+        }
+    }
+
+    private var logLevels: [ChromecastKitLogLevel] {
+        [.none, .error, .warning, .info, .debug, .trace]
+    }
+
+    private func logLevelTitle(_ level: ChromecastKitLogLevel) -> String {
+        switch level {
+        case .none: "None"
+        case .error: "Error"
+        case .warning: "Warning"
+        case .info: "Info"
+        case .debug: "Debug"
+        case .trace: "Trace"
         }
     }
 }

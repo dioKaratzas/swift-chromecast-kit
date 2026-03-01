@@ -24,7 +24,7 @@ actor CastSessionRuntime {
     private let autoReconnect: Bool
     private let reconnectPolicy: CastSession.ReconnectPolicy
     private let stateRestorationPolicy: CastSession.StateRestorationPolicy
-    private let observability: CastSession.Observability
+    private let logger: ChromecastKitDiagnosticsLogger
     private let networkPathMonitor: (any CastNetworkPathMonitoring)?
     private let reconnectRandomUnit: @Sendable () -> Double
     private var inboundTask: Task<Void, Never>?
@@ -65,7 +65,7 @@ actor CastSessionRuntime {
         autoReconnect: Bool = true,
         reconnectPolicy: CastSession.ReconnectPolicy = .exponential(initialDelay: 1),
         stateRestorationPolicy: CastSession.StateRestorationPolicy = .receiverAndMedia,
-        observability: CastSession.Observability = .disabled,
+        logLevel: ChromecastKitLogLevel = .error,
         networkPathMonitor: (any CastNetworkPathMonitoring)? = nil,
         reconnectRandomUnit: @escaping @Sendable () -> Double = { Double.random(in: 0 ... 1) }
     ) {
@@ -83,7 +83,7 @@ actor CastSessionRuntime {
         self.autoReconnect = autoReconnect
         self.reconnectPolicy = reconnectPolicy
         self.stateRestorationPolicy = stateRestorationPolicy
-        self.observability = observability
+        logger = .init(level: logLevel, category: .session)
         self.networkPathMonitor = networkPathMonitor
         self.reconnectRandomUnit = reconnectRandomUnit
     }
@@ -92,12 +92,15 @@ actor CastSessionRuntime {
         device: CastDeviceDescriptor,
         transport: any CastConnectionTransport & CastCommandTransport,
         configuration: CastConnection.Configuration = .init(),
-        observability: CastSession.Observability = .disabled,
         networkPathMonitor: (any CastNetworkPathMonitoring)? = nil,
         reconnectRandomUnit: @escaping @Sendable () -> Double = { Double.random(in: 0 ... 1) }
     ) {
         let connection = CastConnection(configuration: configuration, transport: transport)
-        let dispatcher = CastCommandDispatcher(transport: transport, defaultReplyTimeout: configuration.commandTimeout)
+        let dispatcher = CastCommandDispatcher(
+            transport: transport,
+            defaultReplyTimeout: configuration.commandTimeout,
+            logLevel: configuration.logLevel
+        )
         let media = CastMediaController(dispatcher: dispatcher)
         let receiver = CastReceiverController(dispatcher: dispatcher)
         let stateStore = CastSessionStateStore()
@@ -125,7 +128,7 @@ actor CastSessionRuntime {
             autoReconnect: configuration.autoReconnect,
             reconnectPolicy: configuration.reconnectPolicy,
             stateRestorationPolicy: configuration.stateRestorationPolicy,
-            observability: observability,
+            logLevel: configuration.logLevel,
             networkPathMonitor: networkPathMonitor ?? {
                 guard configuration.reconnectPolicy.waitsForReachableNetworkPath else {
                     return nil
@@ -472,7 +475,7 @@ actor CastSessionRuntime {
         let traceID = UUID()
         emitTrace(
             name: "cast.session.recovery",
-            phase: .begin,
+            phase: "begin",
             traceID: traceID,
             attributes: ["reason": reason.rawValue]
         )
@@ -712,6 +715,7 @@ actor CastSessionRuntime {
 
     private func handleBootstrapFailure(_ error: any Error) async {
         let castError = (error as? CastError) ?? .connectionFailed(String(describing: error))
+        logger.error("post-connect bootstrap failed: \(castError)")
         resetRuntimeLoops()
         resetApplicationTransportContext()
         await dispatcher.failAllPendingReplies(with: castError)
@@ -724,6 +728,7 @@ actor CastSessionRuntime {
         recoveryReason: CastConnection.DisconnectReason
     ) async {
         let castError = (error as? CastError) ?? .connectionFailed(String(describing: error))
+        logger.error("background runtime failure: \(castError)")
         await dispatcher.failAllPendingReplies(with: castError)
         await connection.reportRuntimeError(castError)
         scheduleRecoveryIfNeeded(reason: recoveryReason)
@@ -731,8 +736,7 @@ actor CastSessionRuntime {
 
     /// Emits runtime-boundary diagnostics for inbound message errors that are intentionally swallowed.
     ///
-    /// These errors are non-fatal for the session loop, but are still surfaced through observability hooks
-    /// to aid debugging and production telemetry.
+    /// These errors are non-fatal for the session loop, but are still logged to aid debugging.
     private func emitInboundRuntimeError(
         code: String,
         message: String,
@@ -769,7 +773,7 @@ actor CastSessionRuntime {
     }
 
     private func emitRecoveryLog(
-        level: CastSession.LogEvent.Level,
+        level: ChromecastKitLogLevel,
         code: String,
         message: String,
         reason: CastConnection.DisconnectReason? = nil,
@@ -806,23 +810,30 @@ actor CastSessionRuntime {
         if let attempts {
             attributes["attempts"] = "\(attempts)"
         }
-        emitTrace(name: "cast.session.recovery", phase: .end, traceID: traceID, attributes: attributes)
+        emitTrace(name: "cast.session.recovery", phase: "end", traceID: traceID, attributes: attributes)
     }
 
     private func emitLog(
-        level: CastSession.LogEvent.Level,
+        level: ChromecastKitLogLevel,
         code: String,
         message: String,
         metadata: [String: String] = [:]
     ) {
-        observability.onLog?(
-            .init(
-                level: level,
-                code: code,
-                message: message,
-                metadata: metadata
-            )
-        )
+        let event = formatDiagnosticEvent(code: code, message: message, metadata: metadata)
+        switch level {
+        case .trace:
+            logger.trace(event)
+        case .debug:
+            logger.debug(event)
+        case .info:
+            logger.info(event)
+        case .warning:
+            logger.warning(event)
+        case .error:
+            logger.error(event)
+        case .none:
+            break
+        }
     }
 
     private func emitMetric(
@@ -831,29 +842,35 @@ actor CastSessionRuntime {
         unit: String,
         dimensions: [String: String] = [:]
     ) {
-        observability.onMetric?(
-            .init(
-                name: name,
-                value: value,
-                unit: unit,
-                dimensions: dimensions
-            )
-        )
+        let metadata = dimensions.isEmpty ? "" : " dimensions=\(formatMetadata(dimensions))"
+        logger.trace("metric name=\(name) value=\(value) unit=\(unit)\(metadata)")
     }
 
     private func emitTrace(
         name: String,
-        phase: CastSession.TraceEvent.Phase,
+        phase: String,
         traceID: UUID,
         attributes: [String: String] = [:]
     ) {
-        observability.onTrace?(
-            .init(
-                name: name,
-                phase: phase,
-                traceID: traceID,
-                attributes: attributes
-            )
-        )
+        let metadata = attributes.isEmpty ? "" : " attributes=\(formatMetadata(attributes))"
+        logger.trace("trace name=\(name) phase=\(phase) id=\(traceID.uuidString)\(metadata)")
+    }
+
+    private func formatDiagnosticEvent(
+        code: String,
+        message: String,
+        metadata: [String: String]
+    ) -> String {
+        guard metadata.isEmpty == false else {
+            return "[\(code)] \(message)"
+        }
+        return "[\(code)] \(message) metadata=\(formatMetadata(metadata))"
+    }
+
+    private func formatMetadata(_ metadata: [String: String]) -> String {
+        metadata
+            .sorted(by: { $0.key < $1.key })
+            .map { "\($0.key)=\($0.value)" }
+            .joined(separator: ",")
     }
 }
