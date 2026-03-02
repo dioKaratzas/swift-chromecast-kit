@@ -28,7 +28,7 @@ actor NWTLSCastV2Transport: CastConnectionTransport, CastCommandTransport, CastI
     init(
         device: CastDeviceDescriptor,
         receiveChunkSize: Int = 64 * 1024,
-        logLevel: ChromecastKitLogLevel = .error
+        logLevel: ChromecastKitLogLevel
     ) {
         self.device = device
         self.receiveChunkSize = max(1024, receiveChunkSize)

@@ -25,6 +25,7 @@ final class PlayerModel {
     private var playerRefreshTask: Task<Void, Never>?
     private var lastCastStatusRefreshAt = Date.distantPast
     private var castStatusRefreshInFlight = false
+    private var sessionLogLevelAtCreation: ChromecastKitLogLevel?
 
     private(set) var discoveryState = CastDiscovery.State.stopped
     private(set) var devices = [CastDeviceDescriptor]()
@@ -62,7 +63,7 @@ final class PlayerModel {
 
     var latestUserError: String?
     private(set) var logs = [LogEntry]()
-    var discoveryLogLevel: ChromecastKitLogLevel = .error {
+    var discoveryLogLevel: ChromecastKitLogLevel {
         didSet {
             if discoveryLogLevel != oldValue {
                 Task { @MainActor [weak self] in
@@ -71,7 +72,8 @@ final class PlayerModel {
             }
         }
     }
-    var sessionLogLevel: ChromecastKitLogLevel = .error
+
+    var sessionLogLevel: ChromecastKitLogLevel
 
     init(
         discoveryConfiguration: CastDiscovery.Configuration = .init(
@@ -691,12 +693,20 @@ final class PlayerModel {
             clearSessionState()
         }
 
+        if session != nil, sessionLogLevelAtCreation != sessionLogLevel {
+            if let session {
+                await session.disconnect(reason: .requested)
+            }
+            clearSessionState()
+        }
+
         if session == nil {
             let newSession = CastSession(
                 device: selectedDevice,
                 configuration: .init(logLevel: sessionLogLevel)
             )
             session = newSession
+            sessionLogLevelAtCreation = sessionLogLevel
             attachSessionStreams(to: newSession)
         }
 
@@ -767,6 +777,7 @@ final class PlayerModel {
         sessionStateEventsTask = nil
 
         session = nil
+        sessionLogLevelAtCreation = nil
         sessionConnectionState = .disconnected
         sessionSnapshot = .init()
         castVolumeLevel = 0.5

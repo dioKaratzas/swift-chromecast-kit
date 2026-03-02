@@ -73,6 +73,9 @@ struct PlayerSettingsView: View {
                 Text("Stop discovery before changing discovery log level.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                Text("Session log level changes apply after reconnecting.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
         }
         .navigationTitle("Player Settings")

@@ -86,13 +86,11 @@ actor NWDNSSDDiscoveryBrowser: CastDiscoveryBrowser {
         switch state {
         case .waiting:
             logger.trace("mDNS browser waiting for network")
-            break
         case let .failed(error):
             logger.error("mDNS browser failed: \(error)")
             emit(.error(.discoveryFailed(String(describing: error))))
         case .cancelled:
             logger.trace("mDNS browser cancelled")
-            break
         case .setup, .ready:
             logger.trace("mDNS browser state=\(String(describing: state))")
             break

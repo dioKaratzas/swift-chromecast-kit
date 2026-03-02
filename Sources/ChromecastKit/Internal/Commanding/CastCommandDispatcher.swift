@@ -99,7 +99,9 @@ actor CastCommandDispatcher {
         let command = try makeEncodedBinaryCommand(
             namespace: namespace, target: target, payload: payload
         )
-        logger.trace("sending tracked binary command requestId=\(command.requestID.rawValue) namespace=\(namespace.rawValue)")
+        logger.trace(
+            "sending tracked binary command requestId=\(command.requestID.rawValue) namespace=\(namespace.rawValue)"
+        )
         try await transport.send(command)
         return command.requestID
     }

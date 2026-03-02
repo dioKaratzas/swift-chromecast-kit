@@ -21,6 +21,7 @@ final class ShowcaseAppModel {
     private var sessionStateEventsTask: Task<Void, Never>?
     private var sessionNamespaceEventsTask: Task<Void, Never>?
     private var autoRefreshMediaTimeTask: Task<Void, Never>?
+    private var sessionConfigurationAtCreation: CastSession.Configuration?
 
     private(set) var discoveryState = CastDiscovery.State.stopped
     private(set) var devices = [CastDeviceDescriptor]()
@@ -349,9 +350,18 @@ final class ShowcaseAppModel {
             clearSessionStateForNewDevice()
         }
 
+        if session != nil,
+           sessionConfigurationAtCreation != sessionConfiguration {
+            if let session {
+                await session.disconnect(reason: .requested)
+            }
+            clearSessionStateForNewDevice()
+        }
+
         if session == nil || session?.device.id != device.id {
             let newSession = CastSession(device: device, configuration: sessionConfiguration)
             self.session = newSession
+            sessionConfigurationAtCreation = sessionConfiguration
             attachSessionStreams(to: newSession)
         }
 
@@ -461,6 +471,7 @@ final class ShowcaseAppModel {
         sessionNamespaceEventsTask = nil
 
         session = nil
+        sessionConfigurationAtCreation = nil
         sessionConnectionState = .disconnected
         sessionSnapshot = .init()
         namespaceReplyText = ""

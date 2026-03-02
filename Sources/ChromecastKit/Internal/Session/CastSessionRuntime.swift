@@ -65,7 +65,7 @@ actor CastSessionRuntime {
         autoReconnect: Bool = true,
         reconnectPolicy: CastSession.ReconnectPolicy = .exponential(initialDelay: 1),
         stateRestorationPolicy: CastSession.StateRestorationPolicy = .receiverAndMedia,
-        logLevel: ChromecastKitLogLevel = .error,
+        logLevel: ChromecastKitLogLevel,
         networkPathMonitor: (any CastNetworkPathMonitoring)? = nil,
         reconnectRandomUnit: @escaping @Sendable () -> Double = { Double.random(in: 0 ... 1) }
     ) {

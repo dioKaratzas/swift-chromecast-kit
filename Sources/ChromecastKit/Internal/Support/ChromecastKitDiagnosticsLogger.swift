@@ -4,8 +4,8 @@
 //  Copyright 2026 Dionysis Karatzas
 //
 
-import Foundation
 import OSLog
+import Foundation
 
 enum ChromecastKitLogCategory: String, Sendable {
     case discovery

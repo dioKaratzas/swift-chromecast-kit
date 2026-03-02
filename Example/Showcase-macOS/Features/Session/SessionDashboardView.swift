@@ -39,6 +39,9 @@ struct SessionDashboardView: View {
                     .labelsHidden()
                     .pickerStyle(.menu)
                 }
+                Text("Session log level changes apply after reconnecting.")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
                 HStack {
                     Button("Refresh Snapshot") {
                         model.refreshSessionSnapshotButtonTapped()
